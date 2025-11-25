@@ -165,7 +165,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         input: { channel },
       });
 
-      // Fetch real data from YouTube
       const result = await scrapeYouTube(channel);
 
       await storage.updateJob(job.id, {
@@ -179,8 +178,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "completed",
         ...result,
       });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to start scraping job" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "YouTube scraping failed" });
     }
   });
 
@@ -188,15 +187,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { query } = req.body;
       if (!query) {
-        return res.status(400).json({ error: "Query is required" });
+        return res.status(400).json({ error: "Username is required" });
       }
 
       const job = await storage.createJob({
         platform: "twitter",
-        input: { query },
+        input: { username: query },
       });
 
-      // Fetch real data from Twitter
       const result = await scrapeTwitter(query);
 
       await storage.updateJob(job.id, {
@@ -210,8 +208,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "completed",
         ...result,
       });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to start scraping job" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Twitter scraping failed" });
     }
   });
 
@@ -227,7 +225,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         input: { username },
       });
 
-      // Fetch real data from Instagram
       const result = await scrapeInstagram(username);
 
       await storage.updateJob(job.id, {
@@ -241,8 +238,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "completed",
         ...result,
       });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to start scraping job" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Instagram scraping failed" });
     }
   });
 
@@ -258,7 +255,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         input: { username },
       });
 
-      // Fetch real data from TikTok
       const result = await scrapeTikTok(username);
 
       await storage.updateJob(job.id, {
@@ -272,8 +268,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "completed",
         ...result,
       });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to start scraping job" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "TikTok scraping failed" });
     }
   });
 
