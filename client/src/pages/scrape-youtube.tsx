@@ -13,7 +13,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface YouTubeResult {
   meta: {
-    url: string;
+    channel: string;
     total_videos: number;
     status: string;
   };
@@ -40,8 +40,8 @@ export default function ScrapeYouTube() {
   const { toast } = useToast();
 
   const scrapeMutation = useMutation({
-    mutationFn: async (url: string) => {
-      const res = await apiRequest("POST", "/api/scrape/youtube", { url });
+    mutationFn: async (channel: string) => {
+      const res = await apiRequest("POST", "/api/scrape/youtube", { channel });
       return res.json();
     },
     onSuccess: (data) => {
@@ -67,11 +67,11 @@ export default function ScrapeYouTube() {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const url = formData.get("url") as string;
+    const channel = formData.get("channel") as string;
     setResult(null);
     setJobId("");
     setStatus("");
-    scrapeMutation.mutate(url);
+    scrapeMutation.mutate(channel);
   };
 
   return (
@@ -90,9 +90,9 @@ export default function ScrapeYouTube() {
 
       <Alert>
         <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Enter Video URL</AlertTitle>
+        <AlertTitle>Enter Channel Name</AlertTitle>
         <AlertDescription>
-          Paste a YouTube video URL to extract metadata including views, likes, and more
+          Enter a YouTube channel name to fetch their latest videos with metadata
         </AlertDescription>
       </Alert>
 
@@ -104,17 +104,16 @@ export default function ScrapeYouTube() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <Label htmlFor="url">Video URL</Label>
+                <Label htmlFor="channel">Channel Name</Label>
                 <Input
-                  id="url"
-                  name="url"
-                  type="url"
-                  placeholder="https://www.youtube.com/watch?v=..."
+                  id="channel"
+                  name="channel"
+                  placeholder="channel_name"
                   required
-                  data-testid="input-youtube-url"
+                  data-testid="input-youtube-channel"
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Paste a YouTube video link
+                  Enter YouTube channel name
                 </p>
               </div>
 

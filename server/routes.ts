@@ -155,18 +155,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/scrape/youtube", async (req, res) => {
     try {
-      const { url } = req.body;
-      if (!url) {
-        return res.status(400).json({ error: "URL is required" });
+      const { channel } = req.body;
+      if (!channel) {
+        return res.status(400).json({ error: "Channel name is required" });
       }
 
       const job = await storage.createJob({
         platform: "youtube",
-        input: { url },
+        input: { channel },
       });
 
       // Fetch real data from YouTube
-      const result = await scrapeYouTube(url);
+      const result = await scrapeYouTube(channel);
 
       await storage.updateJob(job.id, {
         status: "completed",

@@ -87,9 +87,9 @@ export default function ScrapeTwitter() {
 
       <Alert>
         <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Enter Search Query</AlertTitle>
+        <AlertTitle>Enter Username</AlertTitle>
         <AlertDescription>
-          Enter keywords to search for tweets across Twitter
+          Enter a Twitter username to fetch their recent tweets
         </AlertDescription>
       </Alert>
 
@@ -101,16 +101,16 @@ export default function ScrapeTwitter() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <Label htmlFor="query">Search Query</Label>
+                <Label htmlFor="query">Username</Label>
                 <Input
                   id="query"
                   name="query"
-                  placeholder="e.g. AI technology"
+                  placeholder="username"
                   required
-                  data-testid="input-twitter-query"
+                  data-testid="input-twitter-username"
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Enter keywords to search
+                  Enter Twitter username
                 </p>
               </div>
 

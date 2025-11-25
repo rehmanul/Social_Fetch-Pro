@@ -2,126 +2,113 @@ import axios from "axios";
 import * as cheerio from "cheerio";
 
 // ============ YOUTUBE SCRAPER ============
-export async function scrapeYouTube(url: string) {
+export async function scrapeYouTube(channelName: string) {
   try {
-    const videoIdMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-    if (!videoIdMatch) {
-      return errorResult("youtube", "Invalid YouTube URL", url);
-    }
-
-    const videoId = videoIdMatch[1];
     const apiKey = process.env.YOUTUBE_API_KEY;
 
     if (apiKey) {
-      // Use YouTube Data API v3 with real API key
-      try {
-        const videoRes = await axios.get("https://www.googleapis.com/youtube/v3/videos", {
+      // First, search for the channel by name
+      const searchRes = await axios.get("https://www.googleapis.com/youtube/v3/search", {
+        params: {
+          part: "snippet",
+          q: channelName,
+          type: "channel",
+          key: apiKey,
+          maxResults: 1,
+        },
+        timeout: 10000,
+      });
+
+      if (searchRes.data.items && searchRes.data.items.length > 0) {
+        const channelId = searchRes.data.items[0].id.channelId;
+
+        // Fetch videos from this channel
+        const videosRes = await axios.get("https://www.googleapis.com/youtube/v3/search", {
           params: {
-            part: "snippet,statistics,contentDetails",
-            id: videoId,
+            part: "snippet",
+            channelId: channelId,
+            type: "video",
+            order: "date",
             key: apiKey,
+            maxResults: 10,
           },
           timeout: 10000,
         });
 
-        if (videoRes.data.items && videoRes.data.items.length > 0) {
-          const video = videoRes.data.items[0];
-          const snippet = video.snippet;
-          const stats = video.statistics;
+        if (videosRes.data.items && videosRes.data.items.length > 0) {
+          const videoIds = videosRes.data.items.map((item: any) => item.id.videoId).join(",");
 
-          return {
-            meta: {
-              url,
-              page: 1,
-              total_pages: 1,
-              total_videos: 1,
-              fetch_method: "youtube_api_v3_real",
-              status: "success",
+          // Get detailed stats for videos
+          const statsRes = await axios.get("https://www.googleapis.com/youtube/v3/videos", {
+            params: {
+              part: "snippet,statistics,contentDetails",
+              id: videoIds,
+              key: apiKey,
             },
-            data: [
-              {
-                video_id: videoId,
-                url,
-                title: snippet.title || "Untitled Video",
-                description: snippet.description || "",
-                views: parseInt(stats.viewCount || "0"),
-                likes: parseInt(stats.likeCount || "0"),
-                comments: parseInt(stats.commentCount || "0"),
-                duration: parseDuration(video.contentDetails.duration),
-                channel: snippet.channelTitle || "Unknown",
-                author_name: snippet.channelTitle || "Creator",
-                thumbnail_url: snippet.thumbnails?.maxres?.url || snippet.thumbnails?.high?.url || `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+            timeout: 10000,
+          });
+
+          if (statsRes.data.items) {
+            return {
+              meta: {
+                channel: channelName,
+                page: 1,
+                total_pages: 1,
+                total_videos: statsRes.data.items.length,
+                fetch_method: "youtube_api_v3_channel_real",
+                status: "success",
               },
-            ],
-            status: "success",
-          };
+              data: statsRes.data.items.map((video: any) => ({
+                video_id: video.id,
+                url: `https://www.youtube.com/watch?v=${video.id}`,
+                title: video.snippet.title || "Untitled Video",
+                description: video.snippet.description || "",
+                views: parseInt(video.statistics.viewCount || "0"),
+                likes: parseInt(video.statistics.likeCount || "0"),
+                comments: parseInt(video.statistics.commentCount || "0"),
+                duration: parseDuration(video.contentDetails.duration),
+                channel: video.snippet.channelTitle || "Unknown",
+                author_name: video.snippet.channelTitle || "Creator",
+                thumbnail_url: video.snippet.thumbnails?.maxres?.url || video.snippet.thumbnails?.high?.url || video.snippet.thumbnails?.default?.url || `https://img.youtube.com/vi/${video.id}/maxresdefault.jpg`,
+              })),
+              status: "success",
+            };
+          }
         }
-      } catch (e) {
-        console.error("YouTube API error:", e);
       }
     }
 
-    // Fallback to page extraction
-    const response = await axios.get(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-      },
-      timeout: 10000,
-    });
-
-    const $ = cheerio.load(response.data);
-    const title = $('meta[property="og:title"]').attr("content") || "Untitled";
-    const description = $('meta[property="og:description"]').attr("content") || "";
-
     return {
       meta: {
-        url,
+        channel: channelName,
         page: 1,
         total_pages: 1,
-        total_videos: 1,
-        fetch_method: "youtube_page_fallback",
-        status: "success",
+        total_videos: 0,
+        fetch_method: "youtube_not_found",
+        status: "error",
+        note: "Channel not found or no API key configured",
       },
-      data: [
-        {
-          video_id: videoId,
-          url,
-          title,
-          description,
-          views: 0,
-          likes: 0,
-          comments: 0,
-          duration: 0,
-          channel: "YouTube Channel",
-          author_name: "Creator",
-          thumbnail_url: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
-        },
-      ],
-      status: "success",
+      data: [],
+      status: "error",
     };
   } catch (error) {
     console.error("YouTube scraping error:", error);
-    return errorResult("youtube", String(error), url);
+    return errorResult("youtube", String(error), { channel: channelName });
   }
 }
 
 // ============ TWITTER SCRAPER ============
-export async function scrapeTwitter(query: string) {
+export async function scrapeTwitter(username: string) {
   try {
     const bearerToken = process.env.TWITTER_BEARER_TOKEN;
-    const apiKey = process.env.TWITTER_API_KEY;
-    const apiSecret = process.env.TWITTER_API_SECRET;
 
     if (bearerToken) {
-      // Use Twitter API v2 with real bearer token
+      // Use Twitter API v2 to fetch tweets from a user
       try {
-        const response = await axios.get("https://api.twitter.com/2/tweets/search/recent", {
+        // First get the user ID
+        const userRes = await axios.get("https://api.twitter.com/2/users/by/username/" + username, {
           params: {
-            query: query,
-            max_results: 10,
-            "tweet.fields": "created_at,public_metrics,author_id",
-            expansions: "author_id",
-            "user.fields": "username,name,public_metrics",
+            "user.fields": "public_metrics",
           },
           headers: {
             Authorization: `Bearer ${bearerToken}`,
@@ -129,69 +116,67 @@ export async function scrapeTwitter(query: string) {
           timeout: 10000,
         });
 
-        if (response.data.data && response.data.data.length > 0) {
-          const userMap = new Map();
-          if (response.data.includes?.users) {
-            response.data.includes.users.forEach((user: any) => {
-              userMap.set(user.id, user);
-            });
-          }
+        if (userRes.data.data) {
+          const userId = userRes.data.data.id;
 
-          return {
-            meta: {
-              query,
-              page: 1,
-              total_pages: 1,
-              total_tweets: response.data.data.length,
-              fetch_method: "twitter_api_v2_real",
-              status: "success",
+          // Then get their recent tweets
+          const tweetsRes = await axios.get(`https://api.twitter.com/2/users/${userId}/tweets`, {
+            params: {
+              max_results: 10,
+              "tweet.fields": "created_at,public_metrics,author_id",
+              "user.fields": "username,name,public_metrics",
             },
-            data: response.data.data.map((tweet: any, i: number) => {
-              const user = userMap.get(tweet.author_id);
-              return {
+            headers: {
+              Authorization: `Bearer ${bearerToken}`,
+            },
+            timeout: 10000,
+          });
+
+          if (tweetsRes.data.data && tweetsRes.data.data.length > 0) {
+            return {
+              meta: {
+                username,
+                page: 1,
+                total_pages: 1,
+                total_tweets: tweetsRes.data.data.length,
+                fetch_method: "twitter_api_v2_user_real",
+                status: "success",
+              },
+              data: tweetsRes.data.data.map((tweet: any) => ({
                 video_id: tweet.id,
-                url: `https://twitter.com/${user?.username || "user"}/status/${tweet.id}`,
+                url: `https://twitter.com/${username}/status/${tweet.id}`,
                 description: tweet.text.substring(0, 280),
                 views: tweet.public_metrics?.impression_count || 0,
                 likes: tweet.public_metrics?.like_count || 0,
                 comments: tweet.public_metrics?.reply_count || 0,
                 shares: tweet.public_metrics?.retweet_count || 0,
-                author_name: user?.username || "unknown",
-              };
-            }),
-            status: "success",
-          };
+                author_name: username,
+              })),
+              status: "success",
+            };
+          }
         }
       } catch (e) {
         console.error("Twitter API error:", e);
       }
     }
 
-    // Fallback to page scraping
-    const searchUrl = `https://twitter.com/search?q=${encodeURIComponent(query)}`;
-    const response = await axios.get(searchUrl, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-      },
-      timeout: 15000,
-    });
-
     return {
       meta: {
-        query,
+        username,
         page: 1,
         total_pages: 1,
         total_tweets: 0,
-        fetch_method: "twitter_page_fallback",
-        status: "partial",
-        note: "Twitter requires authentication. Check API credentials.",
+        fetch_method: "twitter_not_found",
+        status: "error",
+        note: "User not found or no API credentials",
       },
       data: [],
-      status: "partial",
+      status: "error",
     };
   } catch (error) {
     console.error("Twitter scraping error:", error);
-    return errorResult("twitter", String(error), { query });
+    return errorResult("twitter", String(error), { username });
   }
 }
 
