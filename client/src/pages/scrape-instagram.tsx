@@ -39,7 +39,8 @@ export default function ScrapeInstagram() {
 
   const scrapeMutation = useMutation({
     mutationFn: async (username: string) => {
-      return apiRequest("POST", "/api/scrape/instagram", { username });
+      const res = await apiRequest("POST", "/api/scrape/instagram", { username });
+      return res.json();
     },
     onSuccess: (data) => {
       setJobId(data.jobId);

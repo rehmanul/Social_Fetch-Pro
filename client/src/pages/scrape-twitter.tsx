@@ -38,7 +38,8 @@ export default function ScrapeTwitter() {
 
   const scrapeMutation = useMutation({
     mutationFn: async (query: string) => {
-      return apiRequest("POST", "/api/scrape/twitter", { query });
+      const res = await apiRequest("POST", "/api/scrape/twitter", { query });
+      return res.json();
     },
     onSuccess: (data) => {
       setJobId(data.jobId);

@@ -41,7 +41,8 @@ export default function ScrapeYouTube() {
 
   const scrapeMutation = useMutation({
     mutationFn: async (url: string) => {
-      return apiRequest("POST", "/api/scrape/youtube", { url });
+      const res = await apiRequest("POST", "/api/scrape/youtube", { url });
+      return res.json();
     },
     onSuccess: (data) => {
       setJobId(data.jobId);

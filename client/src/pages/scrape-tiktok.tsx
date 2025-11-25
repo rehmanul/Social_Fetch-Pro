@@ -39,7 +39,8 @@ export default function ScrapeTikTok() {
 
   const scrapeMutation = useMutation({
     mutationFn: async (username: string) => {
-      return apiRequest("POST", "/api/scrape/tiktok", { username });
+      const res = await apiRequest("POST", "/api/scrape/tiktok", { username });
+      return res.json();
     },
     onSuccess: (data) => {
       setJobId(data.jobId);
