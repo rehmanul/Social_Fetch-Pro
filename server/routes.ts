@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertJobSchema, insertTwitterAccountSchema, insertInstagramCredentialSchema } from "@shared/schema";
 import { z } from "zod";
+import { scrapeYouTube, scrapeTikTok, scrapeTwitter, scrapeInstagram } from "./scrapers";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -164,41 +165,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         input: { url },
       });
 
-      const mockResult = {
-        meta: {
-          url,
-          page: 1,
-          total_pages: 1,
-          total_videos: 1,
-          fetch_method: "oauth2_tv_client",
-          status: "success",
-        },
-        data: [{
-          video_id: "dQw4w9WgXcQ",
-          url,
-          title: "Sample YouTube Video",
-          description: "A sample video from YouTube using OAuth2 TV client",
-          views: 1234567,
-          likes: 54321,
-          comments: 2345,
-          duration: 180,
-          channel: "Sample Channel",
-          author_name: "Sample Channel",
-          thumbnail_url: "https://via.placeholder.com/320x180?text=YouTube",
-        }],
-        status: "success",
-      };
+      // Fetch real data from YouTube
+      const result = await scrapeYouTube(url);
 
       await storage.updateJob(job.id, {
         status: "completed",
-        result: mockResult,
+        result,
         completedAt: new Date(),
       });
 
       res.json({
         jobId: job.id,
         status: "completed",
-        ...mockResult,
+        ...result,
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to start scraping job" });
@@ -217,50 +196,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         input: { query },
       });
 
-      const mockResult = {
-        meta: {
-          query,
-          page: 1,
-          total_pages: 1,
-          total_tweets: 2,
-          fetch_method: "account_swarm",
-          status: "success",
-        },
-        data: [
-          {
-            video_id: "1234567890",
-            url: "https://twitter.com/sample/status/1234567890",
-            description: `Sample tweet about ${query}`,
-            views: 5432,
-            likes: 42,
-            comments: 10,
-            shares: 8,
-            author_name: "sample_user",
-          },
-          {
-            video_id: "1234567891",
-            url: "https://twitter.com/another/status/1234567891",
-            description: `Another tweet mentioning ${query}`,
-            views: 8765,
-            likes: 123,
-            comments: 45,
-            shares: 34,
-            author_name: "another_user",
-          },
-        ],
-        status: "success",
-      };
+      // Fetch real data from Twitter
+      const result = await scrapeTwitter(query);
 
       await storage.updateJob(job.id, {
         status: "completed",
-        result: mockResult,
+        result,
         completedAt: new Date(),
       });
 
       res.json({
         jobId: job.id,
         status: "completed",
-        ...mockResult,
+        ...result,
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to start scraping job" });
@@ -279,52 +227,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         input: { username },
       });
 
-      const mockResult = {
-        meta: {
-          username,
-          page: 1,
-          total_pages: 1,
-          total_posts: 2,
-          fetch_method: "mobile_api_emulation",
-          status: "success",
-        },
-        data: [
-          {
-            video_id: "3123456789",
-            url: `https://instagram.com/p/3123456789/`,
-            description: `Sample post from ${username}`,
-            views: 890,
-            likes: 567,
-            comments: 23,
-            shares: 12,
-            author_name: username,
-            thumbnail_url: "https://via.placeholder.com/400x400?text=Instagram",
-          },
-          {
-            video_id: "3123456790",
-            url: `https://instagram.com/p/3123456790/`,
-            description: "Another sample Instagram post",
-            views: 1200,
-            likes: 890,
-            comments: 45,
-            shares: 34,
-            author_name: username,
-            thumbnail_url: "https://via.placeholder.com/400x400?text=Instagram",
-          },
-        ],
-        status: "success",
-      };
+      // Fetch real data from Instagram
+      const result = await scrapeInstagram(username);
 
       await storage.updateJob(job.id, {
         status: "completed",
-        result: mockResult,
+        result,
         completedAt: new Date(),
       });
 
       res.json({
         jobId: job.id,
         status: "completed",
-        ...mockResult,
+        ...result,
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to start scraping job" });
@@ -343,57 +258,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         input: { username },
       });
 
-      const mockResult = {
-        meta: {
-          username,
-          page: 1,
-          total_pages: 1,
-          posts_per_page: 30,
-          total_posts: 2,
-          fetched_posts: 2,
-          fetch_method: "hybrid_signing_architecture",
-          status: "success",
-          has_more: false,
-        },
-        data: [
-          {
-            video_id: "6727327145951183878",
-            url: `https://www.tiktok.com/@${username}/video/6727327145951183878`,
-            description: "Sample TikTok video",
-            views: 234567,
-            likes: 12345,
-            comments: 678,
-            shares: 456,
-            duration: 15,
-            author_name: username,
-            thumbnail_url: "https://via.placeholder.com/480x854?text=TikTok",
-          },
-          {
-            video_id: "6727327145951183879",
-            url: `https://www.tiktok.com/@${username}/video/6727327145951183879`,
-            description: "Another TikTok video",
-            views: 567890,
-            likes: 45678,
-            comments: 1234,
-            shares: 890,
-            duration: 12,
-            author_name: username,
-            thumbnail_url: "https://via.placeholder.com/480x854?text=TikTok",
-          },
-        ],
-        status: "success",
-      };
+      // Fetch real data from TikTok
+      const result = await scrapeTikTok(username);
 
       await storage.updateJob(job.id, {
         status: "completed",
-        result: mockResult,
+        result,
         completedAt: new Date(),
       });
 
       res.json({
         jobId: job.id,
         status: "completed",
-        ...mockResult,
+        ...result,
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to start scraping job" });
