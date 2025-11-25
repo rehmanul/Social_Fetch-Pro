@@ -1,10 +1,4 @@
-import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
 import {
-  jobs,
-  twitterAccounts,
-  instagramCredentials,
-  platformStats,
   type Job,
   type InsertJob,
   type TwitterAccount,
@@ -13,6 +7,8 @@ import {
   type InsertInstagramCredential,
   type PlatformStat,
 } from "@shared/schema";
+import * as fs from "fs";
+import * as path from "path";
 
 export interface IStorage {
   createJob(job: InsertJob): Promise<Job>;
@@ -36,246 +32,252 @@ export interface IStorage {
   updatePlatformStats(platform: string, updates: Partial<PlatformStat>): Promise<void>;
 }
 
-export class DatabaseStorage implements IStorage {
-  async createJob(insertJob: InsertJob): Promise<Job> {
-    try {
-      const [job] = await db
-        .insert(jobs)
-        .values({
-          ...insertJob,
-          status: "queued" as const,
-        })
-        .returning();
-      return job as Job;
-    } catch (error) {
-      console.error("Error creating job:", error);
-      throw error;
-    }
-  }
+const DATA_DIR = path.join(process.cwd(), ".data");
+const JOBS_FILE = path.join(DATA_DIR, "jobs.json");
+const TWITTER_ACCOUNTS_FILE = path.join(DATA_DIR, "twitter_accounts.json");
+const INSTAGRAM_CREDENTIALS_FILE = path.join(DATA_DIR, "instagram_credentials.json");
+const PLATFORM_STATS_FILE = path.join(DATA_DIR, "platform_stats.json");
 
-  async getJob(id: string): Promise<Job | undefined> {
-    try {
-      const result = await db.select().from(jobs).where(eq(jobs.id, id)).limit(1);
-      return result[0];
-    } catch (error) {
-      console.error("Error fetching job:", error);
-      throw error;
-    }
-  }
-
-  async getAllJobs(): Promise<Job[]> {
-    try {
-      const result = await db.select().from(jobs).orderBy(desc(jobs.createdAt));
-      return result;
-    } catch (error) {
-      console.error("Error fetching all jobs:", error);
-      throw error;
-    }
-  }
-
-  async getRecentJobs(limit: number): Promise<Job[]> {
-    try {
-      const result = await db
-        .select()
-        .from(jobs)
-        .orderBy(desc(jobs.createdAt))
-        .limit(limit);
-      return result;
-    } catch (error) {
-      console.error("Error fetching recent jobs:", error);
-      throw error;
-    }
-  }
-
-  async updateJob(id: string, updates: Partial<Job>): Promise<Job | undefined> {
-    try {
-      const [updated] = await db
-        .update(jobs)
-        .set(updates)
-        .where(eq(jobs.id, id))
-        .returning();
-      return updated;
-    } catch (error) {
-      console.error("Error updating job:", error);
-      throw error;
-    }
-  }
-
-  async deleteJob(id: string): Promise<boolean> {
-    try {
-      await db.delete(jobs).where(eq(jobs.id, id));
-      return true;
-    } catch (error) {
-      console.error("Error deleting job:", error);
-      return false;
-    }
-  }
-
-  async getTwitterAccounts(): Promise<TwitterAccount[]> {
-    try {
-      return await db.select().from(twitterAccounts);
-    } catch (error) {
-      console.error("Error fetching Twitter accounts:", error);
-      throw error;
-    }
-  }
-
-  async createTwitterAccount(insertAccount: InsertTwitterAccount): Promise<TwitterAccount> {
-    try {
-      const [account] = await db
-        .insert(twitterAccounts)
-        .values({
-          ...insertAccount,
-          status: "active" as const,
-          loginCount: 0,
-        })
-        .returning();
-      return account as TwitterAccount;
-    } catch (error) {
-      console.error("Error creating Twitter account:", error);
-      throw error;
-    }
-  }
-
-  async getTwitterAccount(id: string): Promise<TwitterAccount | undefined> {
-    try {
-      const result = await db
-        .select()
-        .from(twitterAccounts)
-        .where(eq(twitterAccounts.id, id))
-        .limit(1);
-      return result[0];
-    } catch (error) {
-      console.error("Error fetching Twitter account:", error);
-      throw error;
-    }
-  }
-
-  async updateTwitterAccount(id: string, updates: Partial<TwitterAccount>): Promise<TwitterAccount | undefined> {
-    try {
-      const [updated] = await db
-        .update(twitterAccounts)
-        .set(updates)
-        .where(eq(twitterAccounts.id, id))
-        .returning();
-      return updated;
-    } catch (error) {
-      console.error("Error updating Twitter account:", error);
-      throw error;
-    }
-  }
-
-  async deleteTwitterAccount(id: string): Promise<boolean> {
-    try {
-      await db.delete(twitterAccounts).where(eq(twitterAccounts.id, id));
-      return true;
-    } catch (error) {
-      console.error("Error deleting Twitter account:", error);
-      return false;
-    }
-  }
-
-  async getInstagramCredential(): Promise<InstagramCredential | undefined> {
-    try {
-      const result = await db.select().from(instagramCredentials).limit(1);
-      return result[0];
-    } catch (error) {
-      console.error("Error fetching Instagram credential:", error);
-      throw error;
-    }
-  }
-
-  async upsertInstagramCredential(insertCredential: InsertInstagramCredential): Promise<InstagramCredential> {
-    try {
-      const existing = await this.getInstagramCredential();
-
-      if (existing) {
-        const [updated] = await db
-          .update(instagramCredentials)
-          .set({
-            ...insertCredential,
-            updatedAt: new Date(),
-          })
-          .where(eq(instagramCredentials.id, existing.id))
-          .returning();
-        return updated as InstagramCredential;
-      }
-
-      const [created] = await db
-        .insert(instagramCredentials)
-        .values({
-          ...insertCredential,
-          status: "active" as const,
-        })
-        .returning();
-      return created as InstagramCredential;
-    } catch (error) {
-      console.error("Error upserting Instagram credential:", error);
-      throw error;
-    }
-  }
-
-  async updateInstagramCredential(id: string, updates: Partial<InstagramCredential>): Promise<InstagramCredential | undefined> {
-    try {
-      const [updated] = await db
-        .update(instagramCredentials)
-        .set({
-          ...updates,
-          updatedAt: new Date(),
-        })
-        .where(eq(instagramCredentials.id, id))
-        .returning();
-      return updated;
-    } catch (error) {
-      console.error("Error updating Instagram credential:", error);
-      throw error;
-    }
-  }
-
-  async getPlatformStats(): Promise<Record<string, PlatformStat>> {
-    try {
-      const stats = await db.select().from(platformStats);
-      const result: Record<string, PlatformStat> = {};
-      for (const stat of stats) {
-        result[stat.platform] = stat;
-      }
-      return result;
-    } catch (error) {
-      console.error("Error fetching platform stats:", error);
-      throw error;
-    }
-  }
-
-  async updatePlatformStats(platform: string, updates: Partial<PlatformStat>): Promise<void> {
-    try {
-      const existing = await db
-        .select()
-        .from(platformStats)
-        .where(eq(platformStats.platform, platform))
-        .limit(1);
-
-      if (existing.length > 0) {
-        await db
-          .update(platformStats)
-          .set({
-            ...updates,
-            updatedAt: new Date(),
-          })
-          .where(eq(platformStats.platform, platform));
-      } else {
-        await db.insert(platformStats).values({
-          platform,
-          totalJobs: updates.totalJobs ?? 0,
-          successfulJobs: updates.successfulJobs ?? 0,
-          failedJobs: updates.failedJobs ?? 0,
-          lastScrapedAt: updates.lastScrapedAt ?? null,
-        });
-      }
-    } catch (error) {
-      console.error("Error updating platform stats:", error);
-      throw error;
-    }
+function ensureDataDir() {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
   }
 }
 
-export const storage = new DatabaseStorage();
+function readJSON<T>(filePath: string, defaultValue: T): T {
+  ensureDataDir();
+  try {
+    if (fs.existsSync(filePath)) {
+      const data = fs.readFileSync(filePath, "utf-8");
+      return JSON.parse(data);
+    }
+  } catch (error) {
+    console.error(`Error reading ${filePath}:`, error);
+  }
+  return defaultValue;
+}
+
+function writeJSON<T>(filePath: string, data: T): void {
+  ensureDataDir();
+  try {
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
+  } catch (error) {
+    console.error(`Error writing ${filePath}:`, error);
+  }
+}
+
+export class FileStorage implements IStorage {
+  private jobs: Map<string, Job>;
+  private twitterAccounts: Map<string, TwitterAccount>;
+  private instagramCredential: InstagramCredential | undefined;
+  private platformStats: Map<string, PlatformStat>;
+
+  constructor() {
+    this.jobs = new Map();
+    this.twitterAccounts = new Map();
+    this.instagramCredential = undefined;
+    this.platformStats = new Map();
+    this.load();
+  }
+
+  private load(): void {
+    // Load jobs
+    const jobsData = readJSON<Record<string, Job>>(JOBS_FILE, {});
+    this.jobs = new Map(Object.entries(jobsData));
+
+    // Load Twitter accounts
+    const twitterData = readJSON<Record<string, TwitterAccount>>(TWITTER_ACCOUNTS_FILE, {});
+    this.twitterAccounts = new Map(Object.entries(twitterData));
+
+    // Load Instagram credential
+    const instagramData = readJSON<InstagramCredential | null>(INSTAGRAM_CREDENTIALS_FILE, null);
+    this.instagramCredential = instagramData || undefined;
+
+    // Load platform stats
+    const statsData = readJSON<Record<string, PlatformStat>>(PLATFORM_STATS_FILE, {});
+    this.platformStats = new Map(Object.entries(statsData));
+
+    console.log("✓ Data storage loaded from files");
+  }
+
+  private saveJobs(): void {
+    const data: Record<string, Job> = {};
+    for (const [key, value] of this.jobs) {
+      data[key] = value;
+    }
+    writeJSON(JOBS_FILE, data);
+  }
+
+  private saveTwitterAccounts(): void {
+    const data: Record<string, TwitterAccount> = {};
+    for (const [key, value] of this.twitterAccounts) {
+      data[key] = value;
+    }
+    writeJSON(TWITTER_ACCOUNTS_FILE, data);
+  }
+
+  private saveInstagramCredential(): void {
+    writeJSON(INSTAGRAM_CREDENTIALS_FILE, this.instagramCredential || null);
+  }
+
+  private savePlatformStats(): void {
+    const data: Record<string, PlatformStat> = {};
+    for (const [key, value] of this.platformStats) {
+      data[key] = value;
+    }
+    writeJSON(PLATFORM_STATS_FILE, data);
+  }
+
+  async createJob(insertJob: InsertJob): Promise<Job> {
+    const id = crypto.randomUUID();
+    const job: Job = {
+      ...insertJob,
+      id,
+      status: "queued",
+      result: null,
+      error: null,
+      createdAt: new Date(),
+      completedAt: null,
+    };
+    this.jobs.set(id, job);
+    this.saveJobs();
+    return job;
+  }
+
+  async getJob(id: string): Promise<Job | undefined> {
+    return this.jobs.get(id);
+  }
+
+  async getAllJobs(): Promise<Job[]> {
+    return Array.from(this.jobs.values()).sort(
+      (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+    );
+  }
+
+  async getRecentJobs(limit: number): Promise<Job[]> {
+    return (await this.getAllJobs()).slice(0, limit);
+  }
+
+  async updateJob(id: string, updates: Partial<Job>): Promise<Job | undefined> {
+    const job = this.jobs.get(id);
+    if (!job) return undefined;
+    const updated = { ...job, ...updates };
+    this.jobs.set(id, updated);
+    this.saveJobs();
+    return updated;
+  }
+
+  async deleteJob(id: string): Promise<boolean> {
+    const deleted = this.jobs.delete(id);
+    if (deleted) this.saveJobs();
+    return deleted;
+  }
+
+  async getTwitterAccounts(): Promise<TwitterAccount[]> {
+    return Array.from(this.twitterAccounts.values());
+  }
+
+  async createTwitterAccount(insertAccount: InsertTwitterAccount): Promise<TwitterAccount> {
+    const id = crypto.randomUUID();
+    const account: TwitterAccount = {
+      ...insertAccount,
+      id,
+      status: "active",
+      lastUsed: null,
+      loginCount: 0,
+      createdAt: new Date(),
+    };
+    this.twitterAccounts.set(id, account);
+    this.saveTwitterAccounts();
+    return account;
+  }
+
+  async getTwitterAccount(id: string): Promise<TwitterAccount | undefined> {
+    return this.twitterAccounts.get(id);
+  }
+
+  async updateTwitterAccount(id: string, updates: Partial<TwitterAccount>): Promise<TwitterAccount | undefined> {
+    const account = this.twitterAccounts.get(id);
+    if (!account) return undefined;
+    const updated = { ...account, ...updates };
+    this.twitterAccounts.set(id, updated);
+    this.saveTwitterAccounts();
+    return updated;
+  }
+
+  async deleteTwitterAccount(id: string): Promise<boolean> {
+    const deleted = this.twitterAccounts.delete(id);
+    if (deleted) this.saveTwitterAccounts();
+    return deleted;
+  }
+
+  async getInstagramCredential(): Promise<InstagramCredential | undefined> {
+    return this.instagramCredential;
+  }
+
+  async upsertInstagramCredential(insertCredential: InsertInstagramCredential): Promise<InstagramCredential> {
+    if (this.instagramCredential) {
+      this.instagramCredential = {
+        ...this.instagramCredential,
+        ...insertCredential,
+        updatedAt: new Date(),
+      };
+    } else {
+      const id = crypto.randomUUID();
+      this.instagramCredential = {
+        ...insertCredential,
+        id,
+        sessionData: null,
+        status: "active",
+        lastUsed: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+    }
+    this.saveInstagramCredential();
+    return this.instagramCredential;
+  }
+
+  async updateInstagramCredential(id: string, updates: Partial<InstagramCredential>): Promise<InstagramCredential | undefined> {
+    if (!this.instagramCredential || this.instagramCredential.id !== id) {
+      return undefined;
+    }
+    this.instagramCredential = {
+      ...this.instagramCredential,
+      ...updates,
+      updatedAt: new Date(),
+    };
+    this.saveInstagramCredential();
+    return this.instagramCredential;
+  }
+
+  async getPlatformStats(): Promise<Record<string, PlatformStat>> {
+    const stats: Record<string, PlatformStat> = {};
+    for (const [platform, stat] of this.platformStats) {
+      stats[platform] = stat;
+    }
+    return stats;
+  }
+
+  async updatePlatformStats(platform: string, updates: Partial<PlatformStat>): Promise<void> {
+    const existing = this.platformStats.get(platform);
+    if (existing) {
+      this.platformStats.set(platform, { ...existing, ...updates, updatedAt: new Date() });
+    } else {
+      const id = crypto.randomUUID();
+      this.platformStats.set(platform, {
+        id,
+        platform,
+        totalJobs: 0,
+        successfulJobs: 0,
+        failedJobs: 0,
+        lastScrapedAt: null,
+        updatedAt: new Date(),
+        ...updates,
+      });
+    }
+    this.savePlatformStats();
+  }
+}
+
+export const storage = new FileStorage();
