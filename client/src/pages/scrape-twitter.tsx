@@ -4,15 +4,34 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { JsonViewer } from "@/components/json-viewer";
+import { ResultCard } from "@/components/result-card";
 import { JobStatusBadge } from "@/components/job-status-badge";
 import { Twitter, Loader2, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
+interface TwitterResult {
+  meta: {
+    query: string;
+    total_tweets: number;
+    status: string;
+  };
+  data: Array<{
+    video_id: string;
+    url: string;
+    description: string;
+    views: number;
+    likes: number;
+    comments: number;
+    shares: number;
+    author_name: string;
+  }>;
+  status: string;
+}
+
 export default function ScrapeTwitter() {
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<TwitterResult | null>(null);
   const [jobId, setJobId] = useState<string>("");
   const [status, setStatus] = useState<string>("");
   const { toast } = useToast();
@@ -24,12 +43,12 @@ export default function ScrapeTwitter() {
     onSuccess: (data) => {
       setJobId(data.jobId);
       setStatus(data.status);
-      if (data.result) {
-        setResult(data.result);
+      if (data.data) {
+        setResult(data);
       }
       toast({
-        title: "Scraping started",
-        description: "Twitter search is being executed via account swarm.",
+        title: "Scraping complete!",
+        description: `Fetched ${data.meta.total_tweets} tweets`,
       });
     },
     onError: (error: Error) => {
@@ -60,24 +79,23 @@ export default function ScrapeTwitter() {
           </div>
           <div>
             <h1 className="text-2xl font-semibold text-foreground">Twitter Scraper</h1>
-            <p className="text-sm text-muted-foreground">Account Swarm & GraphQL Access</p>
+            <p className="text-sm text-muted-foreground">Search and fetch tweets</p>
           </div>
         </div>
       </div>
 
       <Alert>
         <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Account Pool Required</AlertTitle>
+        <AlertTitle>Enter Search Query</AlertTitle>
         <AlertDescription>
-          Twitter scraping uses a pool of authenticated accounts to distribute load and
-          bypass rate limits. Configure accounts in the Accounts page.
+          Enter keywords to search for tweets across Twitter
         </AlertDescription>
       </Alert>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Card className="lg:col-span-1">
           <CardHeader>
-            <CardTitle className="text-lg font-medium">Configuration</CardTitle>
+            <CardTitle className="text-lg font-medium">Search</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -86,27 +104,13 @@ export default function ScrapeTwitter() {
                 <Input
                   id="query"
                   name="query"
-                  placeholder="AI technology"
+                  placeholder="e.g. AI technology"
                   required
                   data-testid="input-twitter-query"
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Supports standard Twitter advanced search syntax
+                  Enter keywords to search
                 </p>
-              </div>
-
-              <div>
-                <Label htmlFor="limit">Result Limit</Label>
-                <Input
-                  id="limit"
-                  name="limit"
-                  type="number"
-                  placeholder="100"
-                  defaultValue="100"
-                  min="1"
-                  max="1000"
-                  data-testid="input-twitter-limit"
-                />
               </div>
 
               <Button
@@ -121,70 +125,63 @@ export default function ScrapeTwitter() {
                     Searching...
                   </>
                 ) : (
-                  "Start Search"
+                  "Search Tweets"
                 )}
               </Button>
 
               {jobId && (
                 <div className="rounded-lg border border-border bg-muted/50 p-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-foreground">Job Status</span>
+                    <span className="text-sm font-medium text-foreground">Status</span>
                     {status && <JobStatusBadge status={status as any} />}
                   </div>
-                  <p className="mt-1 text-xs text-muted-foreground">Job ID: {jobId}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Job: {jobId}</p>
                 </div>
               )}
             </form>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg font-medium">Result Preview</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {scrapeMutation.isPending ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
-            ) : result ? (
-              <JsonViewer data={result} />
-            ) : (
-              <div className="flex flex-col items-center justify-center py-12">
-                <Twitter className="h-12 w-12 text-muted-foreground/50" />
-                <p className="mt-4 text-sm text-muted-foreground">No results yet</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Submit a query to see tweets
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {result && (
+          <div className="lg:col-span-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg font-medium">
+                  Results ({result.meta.total_tweets} tweets)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {result.data.map((tweet) => (
+                    <ResultCard
+                      key={tweet.video_id}
+                      title={tweet.description}
+                      author={tweet.author_name}
+                      url={tweet.url}
+                      type="tweet"
+                      stats={{
+                        views: tweet.views,
+                        likes: tweet.likes,
+                        comments: tweet.comments,
+                        shares: tweet.shares,
+                      }}
+                    />
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg font-medium">How It Works</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <h4 className="text-sm font-medium text-foreground">Account Swarm Strategy</h4>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Uses twscrape to manage a pool of Twitter accounts, automatically rotating
-              between them to avoid rate limits and distribute load.
-            </p>
-          </div>
-          <div>
-            <h4 className="text-sm font-medium text-foreground">Extracted Data</h4>
-            <ul className="mt-1 space-y-1 text-sm text-muted-foreground">
-              <li>• Tweet ID, author, and content</li>
-              <li>• Like and retweet counts</li>
-              <li>• Timestamp and engagement metrics</li>
-              <li>• Media attachments (if any)</li>
-            </ul>
-          </div>
-        </CardContent>
-      </Card>
+      {!result && !scrapeMutation.isPending && (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Twitter className="h-12 w-12 text-muted-foreground/50" />
+            <p className="mt-4 text-sm text-muted-foreground">Enter a search query to fetch tweets</p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
