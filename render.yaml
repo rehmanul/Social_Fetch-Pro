@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: social-fetch-pro
+    env: node
+    plan: starter
+    autoDeploy: true
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: YOUTUBE_COOKIE
+        sync: false
+      - key: TWITTER_COOKIE
+        sync: false
+      - key: INSTAGRAM_COOKIE
+        sync: false
+      - key: INSTAGRAM_SESSION_ID
+        sync: false
+      - key: TIKTOK_COOKIE
+        sync: false
+      - key: TIKTOK_SESSION_ID
+        sync: false
+    disk: data
+disks:
+  - name: data
+    mountPath: /opt/render/project/src/.data
+    sizeGB: 1

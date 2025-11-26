@@ -84,7 +84,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteJob(id: string): Promise<boolean> {
     const result = await db.delete(jobs).where(eq(jobs.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   }
 
   async getTwitterAccounts(): Promise<TwitterAccount[]> {
@@ -108,7 +108,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteTwitterAccount(id: string): Promise<boolean> {
     const result = await db.delete(twitterAccounts).where(eq(twitterAccounts.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   }
 
   async getInstagramCredential(): Promise<InstagramCredential | undefined> {
