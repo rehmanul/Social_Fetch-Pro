@@ -50,6 +50,7 @@ You can deploy manually from the dashboard or by using the included Render Bluep
    ```
 4. Future changes can be rolled out via the same Blueprint deploy command or by pushing to the tracked Git branch if auto-deploy is enabled.
 
+=======
 1. Push your code to a Git repository accessible to Render.
 2. Set the environment variables from `.env.example` in the Render dashboard (or via the Render CLI) so scrapers can authenticate.
 3. Configure a Web Service with the following:
