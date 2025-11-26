@@ -176,7 +176,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         jobId: job.id,
         status: "completed",
-        ...result,
+        result,
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message || "YouTube scraping failed" });
@@ -206,7 +206,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         jobId: job.id,
         status: "completed",
-        ...result,
+        result,
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message || "Twitter scraping failed" });
@@ -236,7 +236,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         jobId: job.id,
         status: "completed",
-        ...result,
+        result,
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message || "Instagram scraping failed" });
@@ -266,7 +266,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         jobId: job.id,
         status: "completed",
-        ...result,
+        result,
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message || "TikTok scraping failed" });

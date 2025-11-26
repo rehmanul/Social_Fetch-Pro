@@ -1,6 +1,8 @@
 import axios from "axios";
 import * as cheerio from "cheerio";
 
+const USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36";
+
 // ============ YOUTUBE SCRAPER (COOKIE-BASED) ============
 export async function scrapeYouTube(channelName: string) {
   try {
@@ -8,18 +10,17 @@ export async function scrapeYouTube(channelName: string) {
     console.log("🎥 YouTube: Starting scrape for", channelName, "with cookies:", youtubeCookie ? "✓" : "✗");
 
     if (!youtubeCookie) {
-      throw new Error("YOUTUBE_COOKIE not configured - add it to Replit secrets. Get it from YouTube browser session.");
+      throw new Error("YOUTUBE_COOKIE not configured - add it to environment secrets from a signed-in YouTube session.");
     }
 
-    // Scrape YouTube channel page
     try {
       const response = await axios.get(`https://www.youtube.com/@${channelName}/videos`, {
         headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "User-Agent": USER_AGENT,
           Cookie: youtubeCookie,
           Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         },
-        timeout: 15000,
+        timeout: 20000,
         validateStatus: () => true,
       });
 
@@ -27,38 +28,47 @@ export async function scrapeYouTube(channelName: string) {
         throw new Error(`YouTube returned status ${response.status} - cookies may be invalid/expired`);
       }
 
-      const $ = cheerio.load(response.data);
-      const videos: any[] = [];
+      const initialData = extractJsonFromHtml(response.data, [
+        /var ytInitialData = ({[\s\S]*?});<\/script>/,
+        /"ytInitialData":({[\s\S]*?}),"ytInitialPlayerResponse"/,
+      ]);
 
-      // Extract video data from page
-      $('a[href*="/watch?v="]').slice(0, 10).each((i, elem) => {
-        const href = $(elem).attr("href");
-        const title = $(elem).attr("title") || $(elem).text();
-        if (href && href.includes("/watch?v=")) {
-          const videoId = new URL(href, "https://youtube.com").searchParams.get("v");
-          if (videoId) {
-            videos.push({
-              video_id: videoId,
-              url: `https://www.youtube.com/watch?v=${videoId}`,
-              title: title || "Untitled Video",
-              description: "",
-              views: Math.floor(Math.random() * 10000000) + 100,
-              likes: Math.floor(Math.random() * 500000) + 10,
-              comments: Math.floor(Math.random() * 50000) + 5,
-              duration: Math.floor(Math.random() * 600) + 60,
-              channel: channelName,
-              author_name: channelName,
-              thumbnail_url: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
-            });
-          }
-        }
-      });
+      const tabs = initialData?.contents?.twoColumnBrowseResultsRenderer?.tabs || [];
+      const videosTab = tabs.find((tab: any) => tab?.tabRenderer?.content?.richGridRenderer);
+      const contents = videosTab?.tabRenderer?.content?.richGridRenderer?.contents || [];
+
+      const videos = contents
+        .map((item: any) => item?.richItemRenderer?.content?.videoRenderer)
+        .filter(Boolean)
+        .slice(0, 15)
+        .map((video: any) => {
+          const videoId = video.videoId;
+          const title = extractRunsText(video.title?.runs) || "Untitled video";
+          const viewCountText = extractRunsText(video.viewCountText?.runs) || video.viewCountText?.simpleText;
+          const durationText = video.lengthText?.simpleText || extractRunsText(video.lengthText?.runs);
+          const description = extractRunsText(video.descriptionSnippet?.runs) || "";
+          const thumbnails = video.thumbnail?.thumbnails || [];
+          const thumbnail = thumbnails[thumbnails.length - 1]?.url;
+
+          return {
+            video_id: videoId,
+            url: `https://www.youtube.com/watch?v=${videoId}`,
+            title,
+            description,
+            views: parseNumericValue(viewCountText),
+            duration: parseVideoDuration(durationText),
+            published: video.publishedTimeText?.simpleText || extractRunsText(video.publishedTimeText?.runs),
+            channel: channelName,
+            author_name: channelName,
+            thumbnail_url: thumbnail,
+          };
+        });
 
       if (videos.length === 0) {
-        throw new Error(`No videos found for @${channelName} - channel may not exist or be private`);
+        throw new Error(`No videos found for @${channelName} - channel may not exist or require additional cookies.`);
       }
 
-      console.log("🎥 YouTube: Got", videos.length, "videos from profile");
+      console.log("🎥 YouTube: Parsed", videos.length, "videos from profile");
 
       return {
         meta: {
@@ -89,14 +99,14 @@ export async function scrapeTwitter(username: string) {
     console.log("🐦 Twitter: Starting scrape for @" + username, "with cookies:", twitterCookie ? "✓" : "✗");
 
     if (!twitterCookie) {
-      throw new Error("TWITTER_COOKIE not configured - add it to Replit secrets. Get it from Twitter browser session.");
+      throw new Error("TWITTER_COOKIE not configured - add it to environment secrets from a logged-in Twitter session.");
     }
 
     try {
       // Scrape Twitter profile
       const response = await axios.get(`https://twitter.com/${username}`, {
         headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "User-Agent": USER_AGENT,
           Cookie: twitterCookie,
           Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         },
@@ -111,25 +121,58 @@ export async function scrapeTwitter(username: string) {
       const $ = cheerio.load(response.data);
       const tweets: any[] = [];
 
-      // Extract tweet links from profile
-      $('a[href*="/status/"]').slice(0, 10).each((i, elem) => {
-        const href = $(elem).attr("href");
-        if (href && href.includes("/status/")) {
-          const tweetId = href.split("/status/")[1]?.split(/[?#]/)[0];
-          if (tweetId && tweetId.match(/^\d+$/)) {
-            tweets.push({
-              video_id: tweetId,
-              url: `https://twitter.com/${username}/status/${tweetId}`,
-              description: "Tweet",
-              views: Math.floor(Math.random() * 100000) + 100,
-              likes: Math.floor(Math.random() * 10000) + 10,
-              comments: Math.floor(Math.random() * 1000) + 5,
-              shares: Math.floor(Math.random() * 500) + 1,
-              author_name: username,
-            });
+      const nextDataRaw = $('script[id="__NEXT_DATA__"]').html();
+      if (nextDataRaw) {
+        try {
+          const nextData = JSON.parse(nextDataRaw);
+          const instructions = nextData?.props?.pageProps?.timeline?.instructions || [];
+
+          for (const instruction of instructions) {
+            const entries = instruction.addEntries?.entries || instruction.entries || [];
+            for (const entry of entries) {
+              const content = entry?.content?.itemContent?.tweet_results?.result;
+              const tweet = content?.legacy;
+              if (tweet?.id_str) {
+                tweets.push({
+                  video_id: tweet.id_str,
+                  url: `https://twitter.com/${username}/status/${tweet.id_str}`,
+                  description: tweet.full_text || tweet.text || "Tweet",
+                  likes: tweet.favorite_count,
+                  comments: tweet.reply_count,
+                  shares: tweet.retweet_count,
+                  views: tweet.quote_count ?? null,
+                  author_name: tweet.user_id_str,
+                  created_at: tweet.created_at,
+                });
+              }
+            }
           }
+        } catch (parseErr) {
+          console.warn("🐦 Twitter: Failed to parse __NEXT_DATA__ payload", parseErr);
         }
-      });
+      }
+
+      // Fallback to href-based discovery if JSON is unavailable
+      if (tweets.length === 0) {
+        $('a[href*="/status/"]').each((_, elem) => {
+          const href = $(elem).attr("href");
+          if (href && href.includes(`/${username}/status/`)) {
+            const tweetId = href.split("/status/")[1]?.split(/[?#]/)[0];
+            if (tweetId && /^\d+$/.test(tweetId) && !tweets.some((t) => t.video_id === tweetId)) {
+              tweets.push({
+                video_id: tweetId,
+                url: `https://twitter.com/${username}/status/${tweetId}`,
+                description: "Tweet",
+                likes: null,
+                comments: null,
+                shares: null,
+                views: null,
+                author_name: username,
+              });
+            }
+          }
+        });
+      }
 
       if (tweets.length === 0) {
         throw new Error(`No tweets found for @${username} - profile may be private, deleted, or cookies invalid`);
@@ -171,14 +214,14 @@ export async function scrapeInstagram(username: string) {
     }
 
     try {
-      // Scrape Instagram profile
-      const response = await axios.get(`https://www.instagram.com/${username}/`, {
+      // Use the web profile API which returns structured media data when authenticated
+      const response = await axios.get(`https://www.instagram.com/api/v1/users/web_profile_info/?username=${username}`, {
         headers: {
-          "User-Agent": "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36",
+          "User-Agent": USER_AGENT,
           Cookie: `sessionid=${instagramSessionId}; ${instagramCookie}`,
-          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          Accept: "application/json",
         },
-        timeout: 15000,
+        timeout: 20000,
         validateStatus: () => true,
       });
 
@@ -186,28 +229,25 @@ export async function scrapeInstagram(username: string) {
         throw new Error(`Instagram returned status ${response.status} - cookies may be invalid/expired`);
       }
 
-      const $ = cheerio.load(response.data);
-      const posts: any[] = [];
-
-      // Extract post links
-      $('a[href*="/p/"]').slice(0, 10).each((i, elem) => {
-        const href = $(elem).attr("href");
-        if (href && href.includes("/p/")) {
-          const postId = href.split("/p/")[1]?.split(/[/?#]/)[0];
-          if (postId && postId.length > 5) {
-            posts.push({
-              video_id: postId,
-              url: `https://instagram.com/p/${postId}/`,
-              description: "Instagram post",
-              views: 0,
-              likes: Math.floor(Math.random() * 100000) + 10,
-              comments: Math.floor(Math.random() * 5000) + 5,
-              shares: 0,
-              author_name: username,
-              thumbnail_url: `https://via.placeholder.com/400x400?text=${username}`,
-            });
-          }
-        }
+      const user = response.data?.data?.user;
+      const edges = user?.edge_owner_to_timeline_media?.edges || [];
+      const posts = edges.slice(0, 15).map((edge: any) => {
+        const node = edge.node;
+        const description = node.edge_media_to_caption?.edges?.[0]?.node?.text || node.accessibility_caption || "Instagram post";
+        return {
+          video_id: node.id,
+          shortcode: node.shortcode,
+          url: `https://www.instagram.com/p/${node.shortcode}/`,
+          description,
+          views: node.is_video ? node.video_view_count ?? 0 : null,
+          likes: node.edge_media_preview_like?.count ?? 0,
+          comments: node.edge_media_to_comment?.count ?? 0,
+          shares: null,
+          author_name: username,
+          thumbnail_url: node.display_url,
+          is_video: node.is_video,
+          timestamp: node.taken_at_timestamp ? new Date(node.taken_at_timestamp * 1000).toISOString() : undefined,
+        };
       });
 
       if (posts.length === 0) {
@@ -250,14 +290,14 @@ export async function scrapeTikTok(username: string) {
     }
 
     try {
-      // Scrape TikTok profile
+      // Scrape TikTok profile and parse the pre-rendered SIGI_STATE payload
       const response = await axios.get(`https://www.tiktok.com/@${username}`, {
         headers: {
-          "User-Agent": "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36",
+          "User-Agent": USER_AGENT,
           Cookie: `sessionid=${tiktokSessionId}; ${tiktokCookie}`,
           Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         },
-        timeout: 15000,
+        timeout: 20000,
         validateStatus: () => true,
       });
 
@@ -265,30 +305,27 @@ export async function scrapeTikTok(username: string) {
         throw new Error(`TikTok returned status ${response.status} - user may not exist or profile is private`);
       }
 
-      const $ = cheerio.load(response.data);
-      const videos: any[] = [];
+      const sigiMatch = response.data.match(/<script id="SIGI_STATE" type="application\/json">(.*?)<\/script>/);
+      if (!sigiMatch || !sigiMatch[1]) {
+        throw new Error("Unable to parse TikTok metadata payload from profile page");
+      }
 
-      // Extract video links from profile
-      $('a[href*="/video/"]').slice(0, 10).each((i, elem) => {
-        const href = $(elem).attr("href");
-        if (href && href.includes("/video/")) {
-          const videoId = href.split("/video/")[1]?.split(/[?#]/)[0];
-          if (videoId && videoId.length > 10) {
-            videos.push({
-              video_id: videoId,
-              url: `https://www.tiktok.com/@${username}/video/${videoId}`,
-              description: `TikTok video by @${username}`,
-              views: Math.floor(Math.random() * 5000000) + 100,
-              likes: Math.floor(Math.random() * 500000) + 10,
-              comments: Math.floor(Math.random() * 50000) + 5,
-              shares: Math.floor(Math.random() * 10000) + 1,
-              duration: Math.floor(Math.random() * 60) + 5,
-              author_name: username,
-              thumbnail_url: `https://p16-sign.tiktokcdn.com/aweme/720x720/${videoId}?x-expires=`,
-            });
-          }
-        }
-      });
+      const sigiState = JSON.parse(sigiMatch[1]);
+      const items = Object.values(sigiState?.ItemModule || {}) as any[];
+      const videos = items.slice(0, 15).map((item) => ({
+        video_id: item.id,
+        url: `https://www.tiktok.com/@${username}/video/${item.id}`,
+        description: item.desc || item.title || `TikTok video by @${username}`,
+        views: item.stats?.playCount ?? null,
+        likes: item.stats?.diggCount ?? null,
+        comments: item.stats?.commentCount ?? null,
+        shares: item.stats?.shareCount ?? null,
+        duration: item.video?.duration ?? null,
+        author_name: item.author,
+        thumbnail_url: item.video?.cover ?? item.video?.dynamicCover,
+        music: item.music?.title,
+        created_at: item.createTime ? new Date(item.createTime * 1000).toISOString() : undefined,
+      }));
 
       if (videos.length === 0) {
         throw new Error(`No videos found for @${username} - profile may be private, deleted, or cookies invalid/expired`);
@@ -323,11 +360,53 @@ export async function scrapeTikTok(username: string) {
 
 // ============ HELPER FUNCTIONS ============
 
-function parseDuration(duration: string): number {
+function extractJsonFromHtml(html: string, patterns: RegExp[]): any {
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match && match[1]) {
+      try {
+        return JSON.parse(match[1]);
+      } catch (error) {
+        console.warn("Failed to parse JSON chunk", error);
+      }
+    }
+  }
+  throw new Error("Unable to locate JSON metadata in response body");
+}
+
+function extractRunsText(runs?: Array<{ text?: string }>): string {
+  if (!runs || !Array.isArray(runs)) return "";
+  return runs.map((r) => r?.text || "").join("").trim();
+}
+
+function parseNumericValue(value?: string): number | null {
+  if (!value) return null;
+  const numeric = value.replace(/[^0-9]/g, "");
+  if (!numeric) return null;
+  return Number.parseInt(numeric, 10);
+}
+
+function parseVideoDuration(duration?: string): number | null {
+  if (!duration) return null;
+  if (duration.startsWith("PT")) {
+    return parseIsoDuration(duration);
+  }
+
+  const segments = duration.split(":").map((s) => Number.parseInt(s, 10));
+  if (segments.some((n) => Number.isNaN(n))) return null;
+
+  let seconds = 0;
+  for (const segment of segments) {
+    seconds = seconds * 60 + segment;
+  }
+  return seconds;
+}
+
+function parseIsoDuration(duration: string): number {
   const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
   if (!match) return 0;
-  const hours = parseInt(match[1] || "0");
-  const minutes = parseInt(match[2] || "0");
-  const seconds = parseInt(match[3] || "0");
+  const hours = Number.parseInt(match[1] || "0", 10);
+  const minutes = Number.parseInt(match[2] || "0", 10);
+  const seconds = Number.parseInt(match[3] || "0", 10);
   return hours * 3600 + minutes * 60 + seconds;
 }
