@@ -50,5 +50,19 @@ You can deploy manually from the dashboard or by using the included Render Bluep
    ```
 4. Future changes can be rolled out via the same Blueprint deploy command or by pushing to the tracked Git branch if auto-deploy is enabled.
 
+=======
+1. Push your code to a Git repository accessible to Render.
+2. Set the environment variables from `.env.example` in the Render dashboard (or via the Render CLI) so scrapers can authenticate.
+3. Configure a Web Service with the following:
+   - **Build Command:** `npm run build`
+   - **Start Command:** `npm start`
+   - **Environment:** Node 20 or newer
+4. Optionally automate deploys with the Render CLI by exporting your Render API token (do **not** commit the token):
+   ```bash
+   export RENDER_API_TOKEN="<your_render_api_token>"
+   render login --api-key "$RENDER_API_TOKEN"
+   render services deploy <service-id>
+   ```
+
 ## Data storage
 Runtime data (jobs, platform stats, and credentials) are stored under `.data/` on disk. When deploying to Render, mount a persistent disk to retain this folder between deploys.
