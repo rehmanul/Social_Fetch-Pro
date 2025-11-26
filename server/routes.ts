@@ -6,7 +6,11 @@ import { z } from "zod";
 import { scrapeYouTube, scrapeTikTok, scrapeTwitter, scrapeInstagram } from "./scrapers";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  
+
+  app.get("/api/health", (_req, res) => {
+    res.json({ status: "ok" });
+  });
+
   app.get("/api/stats", async (req, res) => {
     try {
       const jobs = await storage.getAllJobs();
