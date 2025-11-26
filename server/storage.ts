@@ -9,6 +9,7 @@ import {
 } from "@shared/schema";
 import * as fs from "fs";
 import * as path from "path";
+import crypto from "node:crypto";
 
 export interface IStorage {
   createJob(job: InsertJob): Promise<Job>;
@@ -83,26 +84,32 @@ export class FileStorage implements IStorage {
   private load(): void {
     // Load jobs
     const jobsData = readJSON<Record<string, Job>>(JOBS_FILE, {});
-    this.jobs = new Map(Object.entries(jobsData));
+    this.jobs = new Map(
+      Object.entries(jobsData).map(([id, job]) => [id, this.parseJob(job)]),
+    );
 
     // Load Twitter accounts
     const twitterData = readJSON<Record<string, TwitterAccount>>(TWITTER_ACCOUNTS_FILE, {});
-    this.twitterAccounts = new Map(Object.entries(twitterData));
+    this.twitterAccounts = new Map(
+      Object.entries(twitterData).map(([id, account]) => [id, this.parseTwitterAccount(account)]),
+    );
 
     // Load Instagram credential
     const instagramData = readJSON<InstagramCredential | null>(INSTAGRAM_CREDENTIALS_FILE, null);
-    this.instagramCredential = instagramData || undefined;
+    this.instagramCredential = instagramData ? this.parseInstagramCredential(instagramData) : undefined;
 
     // Load platform stats
     const statsData = readJSON<Record<string, PlatformStat>>(PLATFORM_STATS_FILE, {});
-    this.platformStats = new Map(Object.entries(statsData));
+    this.platformStats = new Map(
+      Object.entries(statsData).map(([platform, stat]) => [platform, this.parsePlatformStat(stat)]),
+    );
 
     console.log("✓ Data storage loaded from files");
   }
 
   private saveJobs(): void {
     const data: Record<string, Job> = {};
-    for (const [key, value] of this.jobs) {
+    for (const [key, value] of Array.from(this.jobs.entries())) {
       data[key] = value;
     }
     writeJSON(JOBS_FILE, data);
@@ -110,7 +117,7 @@ export class FileStorage implements IStorage {
 
   private saveTwitterAccounts(): void {
     const data: Record<string, TwitterAccount> = {};
-    for (const [key, value] of this.twitterAccounts) {
+    for (const [key, value] of Array.from(this.twitterAccounts.entries())) {
       data[key] = value;
     }
     writeJSON(TWITTER_ACCOUNTS_FILE, data);
@@ -122,7 +129,7 @@ export class FileStorage implements IStorage {
 
   private savePlatformStats(): void {
     const data: Record<string, PlatformStat> = {};
-    for (const [key, value] of this.platformStats) {
+    for (const [key, value] of Array.from(this.platformStats.entries())) {
       data[key] = value;
     }
     writeJSON(PLATFORM_STATS_FILE, data);
@@ -253,7 +260,7 @@ export class FileStorage implements IStorage {
 
   async getPlatformStats(): Promise<Record<string, PlatformStat>> {
     const stats: Record<string, PlatformStat> = {};
-    for (const [platform, stat] of this.platformStats) {
+    for (const [platform, stat] of Array.from(this.platformStats.entries())) {
       stats[platform] = stat;
     }
     return stats;
@@ -277,6 +284,39 @@ export class FileStorage implements IStorage {
       });
     }
     this.savePlatformStats();
+  }
+
+  private parseJob(job: Job): Job {
+    return {
+      ...job,
+      createdAt: new Date(job.createdAt),
+      completedAt: job.completedAt ? new Date(job.completedAt) : null,
+    };
+  }
+
+  private parseTwitterAccount(account: TwitterAccount): TwitterAccount {
+    return {
+      ...account,
+      lastUsed: account.lastUsed ? new Date(account.lastUsed) : null,
+      createdAt: new Date(account.createdAt),
+    };
+  }
+
+  private parseInstagramCredential(credential: InstagramCredential): InstagramCredential {
+    return {
+      ...credential,
+      lastUsed: credential.lastUsed ? new Date(credential.lastUsed) : null,
+      createdAt: new Date(credential.createdAt),
+      updatedAt: new Date(credential.updatedAt),
+    };
+  }
+
+  private parsePlatformStat(stat: PlatformStat): PlatformStat {
+    return {
+      ...stat,
+      lastScrapedAt: stat.lastScrapedAt ? new Date(stat.lastScrapedAt) : null,
+      updatedAt: new Date(stat.updatedAt),
+    };
   }
 }
 

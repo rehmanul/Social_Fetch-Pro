@@ -201,10 +201,10 @@ export default function Jobs() {
                 <JsonViewer data={selectedJob.input} />
               </div>
 
-              {selectedJob.result && (
+              {selectedJob.result !== null && selectedJob.result !== undefined && (
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-2">Result</p>
-                  <JsonViewer data={selectedJob.result} />
+                  <JsonViewer data={selectedJob.result as any} />
                 </div>
               )}
 
