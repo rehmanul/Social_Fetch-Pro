@@ -1,0 +1,158 @@
+{
+  "1617d99d-2e68-4782-8d97-f80fcc4d34bb": {
+    "platform": "youtube",
+    "input": {
+      "channel": "MrBeast"
+    },
+    "id": "1617d99d-2e68-4782-8d97-f80fcc4d34bb",
+    "status": "queued",
+    "result": null,
+    "error": null,
+    "createdAt": "2025-11-26T08:15:37.171Z",
+    "completedAt": null
+  },
+  "5dd4a9dd-9ee3-46c1-be2c-1079954c2199": {
+    "platform": "twitter",
+    "input": {
+      "username": "elonmusk"
+    },
+    "id": "5dd4a9dd-9ee3-46c1-be2c-1079954c2199",
+    "status": "queued",
+    "result": null,
+    "error": null,
+    "createdAt": "2025-11-26T08:15:37.948Z",
+    "completedAt": null
+  },
+  "652f668d-b40f-4d0f-8154-d6276eeb6a0d": {
+    "platform": "instagram",
+    "input": {
+      "username": "instagram"
+    },
+    "id": "652f668d-b40f-4d0f-8154-d6276eeb6a0d",
+    "status": "queued",
+    "result": null,
+    "error": null,
+    "createdAt": "2025-11-26T08:15:38.007Z",
+    "completedAt": null
+  },
+  "f9836088-4112-4fa7-88e3-497e76844d18": {
+    "platform": "tiktok",
+    "input": {
+      "username": "tiktok"
+    },
+    "id": "f9836088-4112-4fa7-88e3-497e76844d18",
+    "status": "queued",
+    "result": null,
+    "error": null,
+    "createdAt": "2025-11-26T08:15:39.602Z",
+    "completedAt": null
+  },
+  "f38d70b4-b1c4-4629-8309-a35cf7662e0f": {
+    "platform": "youtube",
+    "input": {
+      "channel": "MrBeast"
+    },
+    "id": "f38d70b4-b1c4-4629-8309-a35cf7662e0f",
+    "status": "queued",
+    "result": null,
+    "error": null,
+    "createdAt": "2025-11-26T08:15:46.245Z",
+    "completedAt": null
+  },
+  "49d75f16-fe9f-4d71-a628-6f3536d90b60": {
+    "platform": "youtube",
+    "input": {
+      "channel": "MrBeast"
+    },
+    "id": "49d75f16-fe9f-4d71-a628-6f3536d90b60",
+    "status": "queued",
+    "result": null,
+    "error": null,
+    "createdAt": "2025-11-26T08:16:07.917Z",
+    "completedAt": null
+  },
+  "7771783b-2447-4541-b889-0e5672177083": {
+    "platform": "twitter",
+    "input": {
+      "username": "elonmusk"
+    },
+    "id": "7771783b-2447-4541-b889-0e5672177083",
+    "status": "queued",
+    "result": null,
+    "error": null,
+    "createdAt": "2025-11-26T08:16:08.501Z",
+    "completedAt": null
+  },
+  "e43cf039-c0d1-4eee-8d8d-a6394489e076": {
+    "platform": "instagram",
+    "input": {
+      "username": "instagram"
+    },
+    "id": "e43cf039-c0d1-4eee-8d8d-a6394489e076",
+    "status": "queued",
+    "result": null,
+    "error": null,
+    "createdAt": "2025-11-26T08:16:08.565Z",
+    "completedAt": null
+  },
+  "3085cce2-9eca-4c9f-89a1-b45179f62129": {
+    "platform": "tiktok",
+    "input": {
+      "username": "tiktok"
+    },
+    "id": "3085cce2-9eca-4c9f-89a1-b45179f62129",
+    "status": "queued",
+    "result": null,
+    "error": null,
+    "createdAt": "2025-11-26T08:16:09.290Z",
+    "completedAt": null
+  },
+  "ef6bf0ab-f948-424f-b83e-89fba78854d1": {
+    "platform": "youtube",
+    "input": {
+      "channel": "MrBeast"
+    },
+    "id": "ef6bf0ab-f948-424f-b83e-89fba78854d1",
+    "status": "queued",
+    "result": null,
+    "error": null,
+    "createdAt": "2025-11-26T08:16:17.014Z",
+    "completedAt": null
+  },
+  "20464c7a-aed8-49a2-b044-c3b13b67eab0": {
+    "platform": "twitter",
+    "input": {
+      "username": "elonmusk"
+    },
+    "id": "20464c7a-aed8-49a2-b044-c3b13b67eab0",
+    "status": "queued",
+    "result": null,
+    "error": null,
+    "createdAt": "2025-11-26T08:16:17.595Z",
+    "completedAt": null
+  },
+  "885049de-1828-4ef7-8e33-1e69555cb236": {
+    "platform": "instagram",
+    "input": {
+      "username": "instagram"
+    },
+    "id": "885049de-1828-4ef7-8e33-1e69555cb236",
+    "status": "queued",
+    "result": null,
+    "error": null,
+    "createdAt": "2025-11-26T08:16:17.645Z",
+    "completedAt": null
+  },
+  "87a82a30-eb2c-4d33-9539-05558c765e17": {
+    "platform": "tiktok",
+    "input": {
+      "username": "tiktok"
+    },
+    "id": "87a82a30-eb2c-4d33-9539-05558c765e17",
+    "status": "queued",
+    "result": null,
+    "error": null,
+    "createdAt": "2025-11-26T08:16:18.312Z",
+    "completedAt": null
+  }
+}
