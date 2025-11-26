@@ -202,5 +202,53 @@
     "error": null,
     "createdAt": "2025-11-26T09:42:59.672Z",
     "completedAt": null
+  },
+  "434b4f00-5104-4ce6-9879-ba7b0f4edf6e": {
+    "platform": "tiktok",
+    "input": {
+      "username": "willsmith"
+    },
+    "id": "434b4f00-5104-4ce6-9879-ba7b0f4edf6e",
+    "status": "queued",
+    "result": null,
+    "error": null,
+    "createdAt": "2025-11-26T14:35:58.713Z",
+    "completedAt": null
+  },
+  "2768fe54-0cd1-4400-84c6-cd0f406f4cdd": {
+    "platform": "twitter",
+    "input": {
+      "username": "MrBeast"
+    },
+    "id": "2768fe54-0cd1-4400-84c6-cd0f406f4cdd",
+    "status": "queued",
+    "result": null,
+    "error": null,
+    "createdAt": "2025-11-26T14:36:07.125Z",
+    "completedAt": null
+  },
+  "1e155620-3625-4555-a0d9-1159a20717dc": {
+    "platform": "youtube",
+    "input": {
+      "channel": "MrBeast"
+    },
+    "id": "1e155620-3625-4555-a0d9-1159a20717dc",
+    "status": "queued",
+    "result": null,
+    "error": null,
+    "createdAt": "2025-11-26T14:36:13.391Z",
+    "completedAt": null
+  },
+  "dd986c80-b454-4b9a-b08d-c56fc9c39c1c": {
+    "platform": "twitter",
+    "input": {
+      "username": "MrBeast"
+    },
+    "id": "dd986c80-b454-4b9a-b08d-c56fc9c39c1c",
+    "status": "queued",
+    "result": null,
+    "error": null,
+    "createdAt": "2025-11-26T14:36:20.270Z",
+    "completedAt": null
   }
 }
