@@ -154,5 +154,53 @@
     "error": null,
     "createdAt": "2025-11-26T08:16:18.312Z",
     "completedAt": null
+  },
+  "c8dd3f29-bbad-4db6-a24a-25f929537fac": {
+    "platform": "youtube",
+    "input": {
+      "channel": "MrBeast"
+    },
+    "id": "c8dd3f29-bbad-4db6-a24a-25f929537fac",
+    "status": "queued",
+    "result": null,
+    "error": null,
+    "createdAt": "2025-11-26T09:42:57.362Z",
+    "completedAt": null
+  },
+  "a52e40f0-63d5-4ace-ada9-5bbc4b17a319": {
+    "platform": "twitter",
+    "input": {
+      "username": "elonmusk"
+    },
+    "id": "a52e40f0-63d5-4ace-ada9-5bbc4b17a319",
+    "status": "queued",
+    "result": null,
+    "error": null,
+    "createdAt": "2025-11-26T09:42:58.253Z",
+    "completedAt": null
+  },
+  "3c931cbf-f163-4854-9449-93aa144e50fa": {
+    "platform": "instagram",
+    "input": {
+      "username": "instagram"
+    },
+    "id": "3c931cbf-f163-4854-9449-93aa144e50fa",
+    "status": "queued",
+    "result": null,
+    "error": null,
+    "createdAt": "2025-11-26T09:42:58.527Z",
+    "completedAt": null
+  },
+  "00a51f8a-554a-4fc5-aafe-e84f81b73f1e": {
+    "platform": "tiktok",
+    "input": {
+      "username": "tiktok"
+    },
+    "id": "00a51f8a-554a-4fc5-aafe-e84f81b73f1e",
+    "status": "queued",
+    "result": null,
+    "error": null,
+    "createdAt": "2025-11-26T09:42:59.672Z",
+    "completedAt": null
   }
 }
