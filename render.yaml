@@ -25,8 +25,3 @@ services:
       name: data
       mountPath: /opt/render/project/src/.data
       sizeGB: 1
-    disk: data
-disks:
-  - name: data
-    mountPath: /opt/render/project/src/.data
-    sizeGB: 1
