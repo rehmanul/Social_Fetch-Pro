@@ -3,10 +3,17 @@ import * as cheerio from "cheerio";
 
 const USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36";
 
+function sanitizeHeaderValue(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const cleaned = value.replace(/[\u0000-\u001F\u007F]/g, "").trim();
+  return cleaned.length > 0 ? cleaned : undefined;
+}
+
 function buildCookieHeader(parts: Array<string | undefined>): string {
   const cleaned = parts
+    .map(sanitizeHeaderValue)
     .filter(Boolean)
-    .map((part) => part!.replace(/[\r\n]+/g, "").trim())
+    .map((part) => part!)
     .filter((part) => part.length > 0);
 
   if (cleaned.length === 0) {
@@ -16,23 +23,29 @@ function buildCookieHeader(parts: Array<string | undefined>): string {
   return cleaned.join("; ");
 }
 
+function normalizeHandle(value: string): string {
+  return value.trim().replace(/^@+/, "");
+}
+
 // ============ YOUTUBE SCRAPER (COOKIE-BASED) ============
 export async function scrapeYouTube(channelName: string) {
   try {
+    const channel = normalizeHandle(channelName);
     const youtubeCookie = process.env.YOUTUBE_COOKIE;
     if (!youtubeCookie) {
       throw new Error("YOUTUBE_COOKIE not configured - add it to environment secrets from a signed-in YouTube session.");
     }
 
     const sanitizedCookie = buildCookieHeader([youtubeCookie]);
-    console.log("🎥 YouTube: Starting scrape for", channelName, "with cookies:", sanitizedCookie ? "✓" : "✗");
+    console.log("🎥 YouTube: Starting scrape for", channel, "with cookies:", sanitizedCookie ? "✓" : "✗");
 
     try {
-      const response = await axios.get(`https://www.youtube.com/@${channelName}/videos`, {
+      const response = await axios.get(`https://www.youtube.com/@${channel}/videos`, {
         headers: {
           "User-Agent": USER_AGENT,
           Cookie: sanitizedCookie,
           Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9",
         },
         timeout: 20000,
         validateStatus: () => true,
@@ -72,8 +85,8 @@ export async function scrapeYouTube(channelName: string) {
             views: parseNumericValue(viewCountText),
             duration: parseVideoDuration(durationText),
             published: video.publishedTimeText?.simpleText || extractRunsText(video.publishedTimeText?.runs),
-            channel: channelName,
-            author_name: channelName,
+            channel,
+            author_name: channel,
             thumbnail_url: thumbnail,
           };
         });
@@ -86,7 +99,7 @@ export async function scrapeYouTube(channelName: string) {
 
       return {
         meta: {
-          channel: channelName,
+          channel,
           page: 1,
           total_pages: 1,
           total_videos: videos.length,
@@ -109,21 +122,23 @@ export async function scrapeYouTube(channelName: string) {
 // ============ TWITTER SCRAPER (COOKIE-BASED) ============
 export async function scrapeTwitter(username: string) {
   try {
+    const handle = normalizeHandle(username);
     const twitterCookie = process.env.TWITTER_COOKIE;
     if (!twitterCookie) {
       throw new Error("TWITTER_COOKIE not configured - add it to environment secrets from a logged-in Twitter session.");
     }
 
     const sanitizedCookie = buildCookieHeader([twitterCookie]);
-    console.log("🐦 Twitter: Starting scrape for @" + username, "with cookies:", sanitizedCookie ? "✓" : "✗");
+    console.log("🐦 Twitter: Starting scrape for @" + handle, "with cookies:", sanitizedCookie ? "✓" : "✗");
 
     try {
       // Scrape Twitter profile
-      const response = await axios.get(`https://twitter.com/${username}`, {
+      const response = await axios.get(`https://twitter.com/${handle}`, {
         headers: {
           "User-Agent": USER_AGENT,
-          Cookie: twitterCookie,
+          Cookie: sanitizedCookie,
           Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9",
         },
         timeout: 15000,
         validateStatus: () => true,
@@ -171,18 +186,18 @@ export async function scrapeTwitter(username: string) {
       if (tweets.length === 0) {
         $('a[href*="/status/"]').each((_, elem) => {
           const href = $(elem).attr("href");
-          if (href && href.includes(`/${username}/status/`)) {
+          if (href && href.includes(`/${handle}/status/`)) {
             const tweetId = href.split("/status/")[1]?.split(/[?#]/)[0];
             if (tweetId && /^\d+$/.test(tweetId) && !tweets.some((t) => t.video_id === tweetId)) {
               tweets.push({
                 video_id: tweetId,
-                url: `https://twitter.com/${username}/status/${tweetId}`,
+                url: `https://twitter.com/${handle}/status/${tweetId}`,
                 description: "Tweet",
                 likes: null,
                 comments: null,
                 shares: null,
                 views: null,
-                author_name: username,
+                author_name: handle,
               });
             }
           }
@@ -197,7 +212,7 @@ export async function scrapeTwitter(username: string) {
 
       return {
         meta: {
-          username,
+          username: handle,
           page: 1,
           total_pages: 1,
           total_tweets: tweets.length,
@@ -220,6 +235,7 @@ export async function scrapeTwitter(username: string) {
 // ============ INSTAGRAM SCRAPER (COOKIE-BASED) ============
 export async function scrapeInstagram(username: string) {
   try {
+    const handle = normalizeHandle(username);
     const instagramCookie = process.env.INSTAGRAM_COOKIE;
     const instagramSessionId = process.env.INSTAGRAM_SESSION_ID;
     if (!instagramCookie || !instagramSessionId) {
@@ -227,19 +243,27 @@ export async function scrapeInstagram(username: string) {
     }
 
     const combinedCookie = buildCookieHeader([`sessionid=${instagramSessionId}`, instagramCookie]);
-    console.log("📷 Instagram: Starting scrape for @" + username, "with cookies:", instagramCookie && instagramSessionId ? "✓" : "✗");
+    console.log("📷 Instagram: Starting scrape for @" + handle, "with cookies:", instagramCookie && instagramSessionId ? "✓" : "✗");
 
     try {
       // Use the web profile API which returns structured media data when authenticated
-      const response = await axios.get(`https://www.instagram.com/api/v1/users/web_profile_info/?username=${username}`, {
+      const response = await axios.get(`https://www.instagram.com/api/v1/users/web_profile_info/?username=${handle}`, {
         headers: {
-          "User-Agent": USER_AGENT,
+          "User-Agent": `${USER_AGENT} Chrome/122.0.0.0 Safari/537.36`,
           Cookie: combinedCookie,
           Accept: "application/json",
+          "Accept-Language": "en-US,en;q=0.9",
+          "X-Requested-With": "XMLHttpRequest",
+          Referer: `https://www.instagram.com/${handle}/`,
         },
         timeout: 20000,
-        validateStatus: () => true,
+        maxRedirects: 0,
+        validateStatus: (status) => status < 400,
       });
+
+      if (response.status === 302) {
+        throw new Error("Instagram redirected to login - cookies may be invalid/expired");
+      }
 
       if (response.status !== 200) {
         throw new Error(`Instagram returned status ${response.status} - cookies may be invalid/expired`);
@@ -259,7 +283,7 @@ export async function scrapeInstagram(username: string) {
           likes: node.edge_media_preview_like?.count ?? 0,
           comments: node.edge_media_to_comment?.count ?? 0,
           shares: null,
-          author_name: username,
+          author_name: handle,
           thumbnail_url: node.display_url,
           is_video: node.is_video,
           timestamp: node.taken_at_timestamp ? new Date(node.taken_at_timestamp * 1000).toISOString() : undefined,
@@ -274,7 +298,7 @@ export async function scrapeInstagram(username: string) {
 
       return {
         meta: {
-          username,
+          username: handle,
           page: 1,
           total_pages: 1,
           total_posts: posts.length,
@@ -297,6 +321,7 @@ export async function scrapeInstagram(username: string) {
 // ============ TIKTOK SCRAPER (COOKIE-BASED) ============
 export async function scrapeTikTok(username: string) {
   try {
+    const handle = normalizeHandle(username);
     const tiktokCookie = process.env.TIKTOK_COOKIE;
     const tiktokSessionId = process.env.TIKTOK_SESSION_ID;
     if (!tiktokCookie || !tiktokSessionId) {
@@ -304,35 +329,63 @@ export async function scrapeTikTok(username: string) {
     }
 
     const combinedCookie = buildCookieHeader([`sessionid=${tiktokSessionId}`, tiktokCookie]);
-    console.log("🎵 TikTok: Starting scrape for @" + username, "with cookies:", tiktokCookie && tiktokSessionId ? "✓" : "✗");
+    console.log("🎵 TikTok: Starting scrape for @" + handle, "with cookies:", tiktokCookie && tiktokSessionId ? "✓" : "✗");
 
     try {
       // Scrape TikTok profile and parse the pre-rendered SIGI_STATE payload
-      const response = await axios.get(`https://www.tiktok.com/@${username}`, {
+      const response = await axios.get(`https://www.tiktok.com/@${handle}`, {
         headers: {
           "User-Agent": USER_AGENT,
           Cookie: combinedCookie,
           Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9",
+          Referer: "https://www.tiktok.com/",
         },
         timeout: 20000,
-        validateStatus: () => true,
+        maxRedirects: 0,
+        validateStatus: (status) => status < 400,
       });
+
+      if (response.status === 302) {
+        throw new Error("TikTok redirected to login - cookies may be invalid/expired");
+      }
 
       if (response.status !== 200) {
         throw new Error(`TikTok returned status ${response.status} - user may not exist or profile is private`);
       }
 
-      const sigiMatch = response.data.match(/<script id="SIGI_STATE" type="application\/json">(.*?)<\/script>/);
-      if (!sigiMatch || !sigiMatch[1]) {
+      const $ = cheerio.load(response.data);
+      let payload: any | null = null;
+
+      const sigiRaw = $('script#SIGI_STATE').first().html();
+      if (sigiRaw) {
+        try {
+          payload = JSON.parse(sigiRaw);
+        } catch {
+          payload = null;
+        }
+      }
+
+      if (!payload) {
+        const universalMatch = response.data.match(/__UNIVERSAL_DATA_FOR_REHYDRATION__\s*=\s*({.*?});/);
+        if (universalMatch && universalMatch[1]) {
+          try {
+            payload = JSON.parse(universalMatch[1]);
+          } catch {
+            payload = null;
+          }
+        }
+      }
+
+      if (!payload) {
         throw new Error("Unable to parse TikTok metadata payload from profile page");
       }
 
-      const sigiState = JSON.parse(sigiMatch[1]);
-      const items = Object.values(sigiState?.ItemModule || {}) as any[];
+      const items = Object.values(payload?.ItemModule || {}) as any[];
       const videos = items.slice(0, 15).map((item) => ({
         video_id: item.id,
-        url: `https://www.tiktok.com/@${username}/video/${item.id}`,
-        description: item.desc || item.title || `TikTok video by @${username}`,
+        url: `https://www.tiktok.com/@${handle}/video/${item.id}`,
+        description: item.desc || item.title || `TikTok video by @${handle}`,
         views: item.stats?.playCount ?? null,
         likes: item.stats?.diggCount ?? null,
         comments: item.stats?.commentCount ?? null,
@@ -352,7 +405,7 @@ export async function scrapeTikTok(username: string) {
 
       return {
         meta: {
-          username,
+          username: handle,
           page: 1,
           total_pages: 1,
           posts_per_page: videos.length,
