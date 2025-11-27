@@ -14,7 +14,7 @@ See [AGENTS.md](AGENTS.md) for contributor rules and production standards.
 2. Copy the environment template and fill in cookie/session values pulled from authenticated browser sessions:
    ```bash
    cp .env.example .env
-   # populate YOUTUBE_COOKIE, TWITTER_COOKIE, INSTAGRAM_COOKIE, INSTAGRAM_SESSION_ID, TIKTOK_COOKIE, TIKTOK_SESSION_ID
+   # populate YOUTUBE_COOKIE, TWITTER_COOKIE, TWITTER_BEARER_TOKEN, INSTAGRAM_COOKIE, INSTAGRAM_SESSION_ID, TIKTOK_COOKIE, TIKTOK_SESSION_ID
    ```
 3. Start the development server (API + client):
    ```bash

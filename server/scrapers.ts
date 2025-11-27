@@ -27,6 +27,15 @@ function normalizeHandle(value: string): string {
   return value.trim().replace(/^@+/, "");
 }
 
+function extractCookieValue(cookieHeader: string, key: string): string | undefined {
+  const pairs = cookieHeader.split(";").map((segment) => segment.trim());
+  const found = pairs.find((segment) => segment.startsWith(`${key}=`));
+  if (!found) return undefined;
+  const [, ...rest] = found.split("=");
+  const value = rest.join("=");
+  return value || undefined;
+}
+
 // ============ YOUTUBE SCRAPER (COOKIE-BASED) ============
 export async function scrapeYouTube(channelName: string) {
   try {
@@ -204,8 +213,89 @@ export async function scrapeTwitter(username: string) {
         });
       }
 
+      // Final attempt: call Twitter timeline API using auth cookie + bearer token
       if (tweets.length === 0) {
-        throw new Error(`No tweets found for @${username} - profile may be private, deleted, or cookies invalid`);
+        const ct0 = extractCookieValue(sanitizedCookie, "ct0");
+        const bearerRaw = process.env.TWITTER_BEARER_TOKEN;
+        if (!bearerRaw) {
+          throw new Error("Twitter API rejected cookies and TWITTER_BEARER_TOKEN is not set");
+        }
+        const bearer = bearerRaw.startsWith("Bearer ") ? bearerRaw.slice("Bearer ".length) : bearerRaw;
+
+        const variables = encodeURIComponent(
+          JSON.stringify({
+            screen_name: handle,
+            count: 20,
+            includePromotedContent: false,
+            withVoice: false,
+          }),
+        );
+
+        const features = encodeURIComponent(
+          JSON.stringify({
+            rweb_lists_timeline_redesign_enabled: false,
+            blue_business_profile_image_shape_enabled: true,
+            responsive_web_graphql_exclude_directive_enabled: true,
+            responsive_web_graphql_skip_user_profile_image_extensions_enabled: false,
+            verified_phone_label_enabled: false,
+            responsive_web_home_pinned_timelines_enabled: true,
+            tweetypie_unmention_optimization_enabled: true,
+            vibe_api_enabled: true,
+            responsive_web_edit_tweet_api_enabled: true,
+            graphql_is_translatable_rweb_tweet_is_translatable_enabled: true,
+            standardized_nudges_misinfo: true,
+            tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled: true,
+            interactive_text_enabled: true,
+            responsive_web_text_conversations_enabled: false,
+            longform_notetweets_consumption_enabled: true,
+            responsive_web_enhance_cards_enabled: true,
+          }),
+        );
+
+        const apiResponse = await axios.get(
+          `https://twitter.com/i/api/graphql/p2KkPOGJnHOi64l-dlBo1Q/UserTweets?variables=${variables}&features=${features}`,
+          {
+            headers: {
+              Authorization: `Bearer ${bearer}`,
+              "User-Agent": USER_AGENT,
+              Cookie: sanitizedCookie,
+              "x-csrf-token": ct0,
+              "x-twitter-active-user": "yes",
+              "x-twitter-client-language": "en",
+              Accept: "application/json",
+            },
+            timeout: 15000,
+            validateStatus: () => true,
+          },
+        );
+
+        if (apiResponse.status === 200) {
+          const entries =
+            apiResponse.data?.data?.user?.result?.timeline_response?.instructions?.flatMap((inst: any) => inst.entries || []) ||
+            apiResponse.data?.data?.user?.result?.timeline?.timeline?.instructions?.flatMap((inst: any) => inst.entries || []) ||
+            [];
+
+          for (const entry of entries) {
+            const tweet = entry?.content?.itemContent?.tweet_results?.result?.legacy;
+            if (tweet?.id_str && !tweets.some((t) => t.video_id === tweet.id_str)) {
+              tweets.push({
+                video_id: tweet.id_str,
+                url: `https://twitter.com/${handle}/status/${tweet.id_str}`,
+                description: tweet.full_text || tweet.text || "Tweet",
+                likes: tweet.favorite_count,
+                comments: tweet.reply_count,
+                shares: tweet.retweet_count,
+                views: tweet.quote_count ?? null,
+                author_name: handle,
+                created_at: tweet.created_at,
+              });
+            }
+          }
+        }
+      }
+
+      if (tweets.length === 0) {
+        throw new Error(`No tweets found for @${handle} - profile may be private, deleted, or cookies invalid`);
       }
 
       console.log("🐦 Twitter: Got", tweets.length, "tweets from profile");
@@ -254,6 +344,7 @@ export async function scrapeInstagram(username: string) {
           Accept: "application/json",
           "Accept-Language": "en-US,en;q=0.9",
           "X-Requested-With": "XMLHttpRequest",
+          "X-IG-App-ID": "936619743392459",
           Referer: `https://www.instagram.com/${handle}/`,
         },
         timeout: 20000,
