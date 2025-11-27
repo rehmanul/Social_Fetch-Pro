@@ -3,6 +3,17 @@ import { pgTable, text, varchar, timestamp, jsonb, integer } from "drizzle-orm/p
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Application Settings (persisted server-side)
+export const settingsSchema = z.object({
+  autoRetry: z.boolean().default(false),
+  notifications: z.boolean().default(false),
+  cacheResults: z.boolean().default(true),
+  proxyRotation: z.boolean().default(false),
+  updatedAt: z.date().optional(),
+});
+
+export type Settings = z.infer<typeof settingsSchema>;
+
 // Platform enumeration
 export const platformEnum = ["youtube", "twitter", "instagram", "tiktok"] as const;
 export type Platform = typeof platformEnum[number];

@@ -3,21 +3,35 @@ import * as cheerio from "cheerio";
 
 const USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36";
 
+function buildCookieHeader(parts: Array<string | undefined>): string {
+  const cleaned = parts
+    .filter(Boolean)
+    .map((part) => part!.replace(/[\r\n]+/g, "").trim())
+    .filter((part) => part.length > 0);
+
+  if (cleaned.length === 0) {
+    throw new Error("Cookie header is missing or invalid after sanitization");
+  }
+
+  return cleaned.join("; ");
+}
+
 // ============ YOUTUBE SCRAPER (COOKIE-BASED) ============
 export async function scrapeYouTube(channelName: string) {
   try {
     const youtubeCookie = process.env.YOUTUBE_COOKIE;
-    console.log("🎥 YouTube: Starting scrape for", channelName, "with cookies:", youtubeCookie ? "✓" : "✗");
-
     if (!youtubeCookie) {
       throw new Error("YOUTUBE_COOKIE not configured - add it to environment secrets from a signed-in YouTube session.");
     }
+
+    const sanitizedCookie = buildCookieHeader([youtubeCookie]);
+    console.log("🎥 YouTube: Starting scrape for", channelName, "with cookies:", sanitizedCookie ? "✓" : "✗");
 
     try {
       const response = await axios.get(`https://www.youtube.com/@${channelName}/videos`, {
         headers: {
           "User-Agent": USER_AGENT,
-          Cookie: youtubeCookie,
+          Cookie: sanitizedCookie,
           Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         },
         timeout: 20000,
@@ -96,11 +110,12 @@ export async function scrapeYouTube(channelName: string) {
 export async function scrapeTwitter(username: string) {
   try {
     const twitterCookie = process.env.TWITTER_COOKIE;
-    console.log("🐦 Twitter: Starting scrape for @" + username, "with cookies:", twitterCookie ? "✓" : "✗");
-
     if (!twitterCookie) {
       throw new Error("TWITTER_COOKIE not configured - add it to environment secrets from a logged-in Twitter session.");
     }
+
+    const sanitizedCookie = buildCookieHeader([twitterCookie]);
+    console.log("🐦 Twitter: Starting scrape for @" + username, "with cookies:", sanitizedCookie ? "✓" : "✗");
 
     try {
       // Scrape Twitter profile
@@ -207,18 +222,19 @@ export async function scrapeInstagram(username: string) {
   try {
     const instagramCookie = process.env.INSTAGRAM_COOKIE;
     const instagramSessionId = process.env.INSTAGRAM_SESSION_ID;
-    console.log("📷 Instagram: Starting scrape for @" + username, "with cookies:", instagramCookie && instagramSessionId ? "✓" : "✗");
-
     if (!instagramCookie || !instagramSessionId) {
       throw new Error("INSTAGRAM_COOKIE or INSTAGRAM_SESSION_ID not configured - add them to Replit secrets. Get from Instagram browser session.");
     }
+
+    const combinedCookie = buildCookieHeader([`sessionid=${instagramSessionId}`, instagramCookie]);
+    console.log("📷 Instagram: Starting scrape for @" + username, "with cookies:", instagramCookie && instagramSessionId ? "✓" : "✗");
 
     try {
       // Use the web profile API which returns structured media data when authenticated
       const response = await axios.get(`https://www.instagram.com/api/v1/users/web_profile_info/?username=${username}`, {
         headers: {
           "User-Agent": USER_AGENT,
-          Cookie: `sessionid=${instagramSessionId}; ${instagramCookie}`,
+          Cookie: combinedCookie,
           Accept: "application/json",
         },
         timeout: 20000,
@@ -283,18 +299,19 @@ export async function scrapeTikTok(username: string) {
   try {
     const tiktokCookie = process.env.TIKTOK_COOKIE;
     const tiktokSessionId = process.env.TIKTOK_SESSION_ID;
-    console.log("🎵 TikTok: Starting scrape for @" + username, "with cookies:", tiktokCookie && tiktokSessionId ? "✓" : "✗");
-
     if (!tiktokCookie || !tiktokSessionId) {
       throw new Error("TIKTOK_COOKIE or TIKTOK_SESSION_ID not configured - add them to Replit secrets. Get from TikTok browser session.");
     }
+
+    const combinedCookie = buildCookieHeader([`sessionid=${tiktokSessionId}`, tiktokCookie]);
+    console.log("🎵 TikTok: Starting scrape for @" + username, "with cookies:", tiktokCookie && tiktokSessionId ? "✓" : "✗");
 
     try {
       // Scrape TikTok profile and parse the pre-rendered SIGI_STATE payload
       const response = await axios.get(`https://www.tiktok.com/@${username}`, {
         headers: {
           "User-Agent": USER_AGENT,
-          Cookie: `sessionid=${tiktokSessionId}; ${tiktokCookie}`,
+          Cookie: combinedCookie,
           Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         },
         timeout: 20000,

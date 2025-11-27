@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertJobSchema, insertTwitterAccountSchema, insertInstagramCredentialSchema } from "@shared/schema";
+import { insertJobSchema, insertTwitterAccountSchema, insertInstagramCredentialSchema, settingsSchema } from "@shared/schema";
 import { z } from "zod";
 import { scrapeYouTube, scrapeTikTok, scrapeTwitter, scrapeInstagram } from "./scrapers";
 
@@ -65,6 +65,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(formattedStats);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch platform stats" });
+    }
+  });
+
+  app.get("/api/settings", async (_req, res) => {
+    try {
+      const settings = await storage.getSettings();
+      res.json(settings);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch settings" });
+    }
+  });
+
+  app.put("/api/settings", async (req, res) => {
+    try {
+      const partialSettings = settingsSchema.partial().parse(req.body);
+      const updated = await storage.updateSettings(partialSettings);
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update settings" });
     }
   });
 

@@ -6,6 +6,8 @@ import {
   type InstagramCredential,
   type InsertInstagramCredential,
   type PlatformStat,
+  type Settings,
+  settingsSchema,
 } from "@shared/schema";
 import * as fs from "fs";
 import * as path from "path";
@@ -31,6 +33,9 @@ export interface IStorage {
 
   getPlatformStats(): Promise<Record<string, PlatformStat>>;
   updatePlatformStats(platform: string, updates: Partial<PlatformStat>): Promise<void>;
+
+  getSettings(): Promise<Settings>;
+  updateSettings(updates: Partial<Settings>): Promise<Settings>;
 }
 
 const DATA_DIR = path.join(process.cwd(), ".data");
@@ -38,6 +43,7 @@ const JOBS_FILE = path.join(DATA_DIR, "jobs.json");
 const TWITTER_ACCOUNTS_FILE = path.join(DATA_DIR, "twitter_accounts.json");
 const INSTAGRAM_CREDENTIALS_FILE = path.join(DATA_DIR, "instagram_credentials.json");
 const PLATFORM_STATS_FILE = path.join(DATA_DIR, "platform_stats.json");
+const SETTINGS_FILE = path.join(DATA_DIR, "settings.json");
 
 function ensureDataDir() {
   if (!fs.existsSync(DATA_DIR)) {
@@ -72,13 +78,25 @@ export class FileStorage implements IStorage {
   private twitterAccounts: Map<string, TwitterAccount>;
   private instagramCredential: InstagramCredential | undefined;
   private platformStats: Map<string, PlatformStat>;
+  private settings: Settings;
 
   constructor() {
     this.jobs = new Map();
     this.twitterAccounts = new Map();
     this.instagramCredential = undefined;
     this.platformStats = new Map();
+    this.settings = this.defaultSettings();
     this.load();
+  }
+
+  private defaultSettings(): Settings {
+    return {
+      autoRetry: false,
+      notifications: false,
+      cacheResults: true,
+      proxyRotation: false,
+      updatedAt: new Date(),
+    };
   }
 
   private load(): void {
@@ -103,6 +121,12 @@ export class FileStorage implements IStorage {
     this.platformStats = new Map(
       Object.entries(statsData).map(([platform, stat]) => [platform, this.parsePlatformStat(stat)]),
     );
+
+    // Load settings
+    const settingsData = readJSON<Settings | null>(SETTINGS_FILE, null);
+    this.settings = settingsData
+      ? this.parseSettings(settingsData)
+      : this.defaultSettings();
 
     console.log("✓ Data storage loaded from files");
   }
@@ -133,6 +157,10 @@ export class FileStorage implements IStorage {
       data[key] = value;
     }
     writeJSON(PLATFORM_STATS_FILE, data);
+  }
+
+  private saveSettings(): void {
+    writeJSON(SETTINGS_FILE, this.settings);
   }
 
   async createJob(insertJob: InsertJob): Promise<Job> {
@@ -286,6 +314,22 @@ export class FileStorage implements IStorage {
     this.savePlatformStats();
   }
 
+  async getSettings(): Promise<Settings> {
+    return this.settings;
+  }
+
+  async updateSettings(updates: Partial<Settings>): Promise<Settings> {
+    const merged = {
+      ...this.defaultSettings(),
+      ...this.settings,
+      ...updates,
+      updatedAt: new Date(),
+    };
+    this.settings = settingsSchema.parse(merged);
+    this.saveSettings();
+    return this.settings;
+  }
+
   private parseJob(job: Job): Job {
     return {
       ...job,
@@ -316,6 +360,14 @@ export class FileStorage implements IStorage {
       ...stat,
       lastScrapedAt: stat.lastScrapedAt ? new Date(stat.lastScrapedAt) : null,
       updatedAt: new Date(stat.updatedAt),
+    };
+  }
+
+  private parseSettings(settings: Settings): Settings {
+    return {
+      ...this.defaultSettings(),
+      ...settings,
+      updatedAt: settings.updatedAt ? new Date(settings.updatedAt) : new Date(),
     };
   }
 }
