@@ -112,21 +112,51 @@ export async function exchangeAuthCode(authCode: string, state?: string): Promis
   }
 
   const base = getTikTokBaseUrl();
-  const response = await axios.post(
-    `${base}/v1.3/oauth2/access_token/`,
-    {
-      app_id: appId,
-      secret: appSecret,
-      auth_code: authCode,
-      grant_type: "authorization_code",
-    },
-    { timeout: 15000 },
-  );
+  console.log("🎵 TikTok: Exchanging auth code for access token");
+  console.log("🎵 TikTok: Using endpoint:", `${base}/v1.3/oauth2/access_token/`);
+
+  let response;
+  try {
+    response = await axios.post(
+      `${base}/v1.3/oauth2/access_token/`,
+      {
+        app_id: appId,
+        secret: appSecret,
+        auth_code: authCode,
+        grant_type: "authorization_code",
+      },
+      {
+        timeout: 15000,
+        validateStatus: () => true, // Accept any status code to see full response
+      },
+    );
+
+    console.log("🎵 TikTok: Response status:", response.status);
+    console.log("🎵 TikTok: Response data:", JSON.stringify(response.data, null, 2));
+  } catch (error: any) {
+    if (error.response) {
+      console.error("🎵 TikTok: API request failed with status:", error.response.status);
+      console.error("🎵 TikTok: Error response:", JSON.stringify(error.response.data, null, 2));
+    }
+    throw error;
+  }
+
+  // Check for TikTok API error response
+  if (response.data?.code && response.data.code !== 0) {
+    throw new Error(
+      `TikTok API error (code ${response.data.code}): ${response.data.message || "Unknown error"}`
+    );
+  }
 
   const data = response.data?.data;
   if (!data?.access_token) {
-    throw new Error("TikTok did not return an access token");
+    throw new Error(
+      `TikTok did not return an access token. Response: ${JSON.stringify(response.data)}`
+    );
   }
+
+  console.log("🎵 TikTok: Successfully obtained access token");
+  console.log("🎵 TikTok: Token expires in:", data.expires_in, "seconds");
 
   const advertiserIds = await fetchAdvertiserIds(data.access_token);
 
