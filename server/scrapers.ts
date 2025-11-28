@@ -448,27 +448,67 @@ export async function scrapeTikTok(username: string) {
       const $ = cheerio.load(response.data);
       let payload: any | null = null;
 
+      // Method 1: Try SIGI_STATE script tag
       const sigiRaw = $('script#SIGI_STATE').first().html();
       if (sigiRaw) {
         try {
           payload = JSON.parse(sigiRaw);
-        } catch {
-          payload = null;
+          console.log("🎵 TikTok: Parsed data from SIGI_STATE script tag");
+        } catch (e) {
+          console.log("🎵 TikTok: SIGI_STATE found but failed to parse");
         }
       }
 
+      // Method 2: Try __UNIVERSAL_DATA_FOR_REHYDRATION__ with improved regex
       if (!payload) {
-        const universalMatch = response.data.match(/__UNIVERSAL_DATA_FOR_REHYDRATION__\s*=\s*({.*?});/);
-        if (universalMatch && universalMatch[1]) {
-          try {
-            payload = JSON.parse(universalMatch[1]);
-          } catch {
-            payload = null;
+        const patterns = [
+          /__UNIVERSAL_DATA_FOR_REHYDRATION__\s*=\s*(\{[\s\S]*?\});?\s*<\/script>/,
+          /window\['SIGI_STATE'\]\s*=\s*(\{[\s\S]*?\});?\s*<\/script>/,
+          /SIGI_STATE\s*=\s*(\{[\s\S]*?\});?\s*<\/script>/,
+        ];
+
+        for (const pattern of patterns) {
+          const match = response.data.match(pattern);
+          if (match && match[1]) {
+            try {
+              payload = JSON.parse(match[1]);
+              console.log("🎵 TikTok: Parsed data from window script pattern");
+              break;
+            } catch (e) {
+              console.log("🎵 TikTok: Pattern matched but JSON parse failed");
+            }
           }
         }
       }
 
+      // Method 3: Try to find any script with ItemModule data
       if (!payload) {
+        $('script').each((_, elem) => {
+          const scriptContent = $(elem).html() || '';
+          if (scriptContent.includes('ItemModule') && scriptContent.includes('{')) {
+            const jsonMatch = scriptContent.match(/(\{[\s\S]*ItemModule[\s\S]*\})/);
+            if (jsonMatch && jsonMatch[1]) {
+              try {
+                payload = JSON.parse(jsonMatch[1]);
+                console.log("🎵 TikTok: Parsed data from ItemModule script search");
+                return false; // break out of each loop
+              } catch (e) {
+                // continue searching
+              }
+            }
+          }
+        });
+      }
+
+      if (!payload) {
+        console.error("🎵 TikTok: Failed to parse payload. Available script tags:");
+        $('script').each((i, elem) => {
+          const scriptId = $(elem).attr('id');
+          const scriptContent = $(elem).html() || '';
+          if (scriptId || scriptContent.length < 5000) {
+            console.error(`  - Script ${i}: id="${scriptId || 'none'}", length=${scriptContent.length}`);
+          }
+        });
         throw new Error("Unable to parse TikTok metadata payload from profile page");
       }
 
