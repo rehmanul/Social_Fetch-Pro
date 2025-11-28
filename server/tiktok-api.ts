@@ -83,6 +83,8 @@ export function isAccessTokenExpired(bundle: TikTokTokenBundle): boolean {
 async function fetchAdvertiserIds(accessToken: string): Promise<string[] | undefined> {
   try {
     const base = getTikTokBaseUrl();
+    console.log("🎵 TikTok: Fetching advertiser list");
+
     const response = await axios.get(`${base}/v1.3/oauth2/advertiser/get/`, {
       headers: {
         "Access-Token": accessToken,
@@ -91,15 +93,31 @@ async function fetchAdvertiserIds(accessToken: string): Promise<string[] | undef
         page_size: 50,
       },
       timeout: 15000,
+      validateStatus: () => true,
     });
 
+    console.log("🎵 TikTok: Advertiser list response status:", response.status);
+    console.log("🎵 TikTok: Advertiser list response:", JSON.stringify(response.data, null, 2));
+
+    if (response.data?.code && response.data.code !== 0) {
+      console.error(`🎵 TikTok: Advertiser list error (code ${response.data.code}): ${response.data.message}`);
+      return undefined;
+    }
+
     const list = response.data?.data?.list || response.data?.data?.advertiser_list;
-    if (!Array.isArray(list)) return undefined;
-    return list
+    if (!Array.isArray(list)) {
+      console.warn("🎵 TikTok: No advertiser list found in response");
+      return undefined;
+    }
+
+    const ids = list
       .map((item: any) => item?.advertiser_id)
       .filter((id: unknown): id is string => typeof id === "string" && id.length > 0);
-  } catch (error) {
-    console.warn("TikTok: unable to fetch advertiser list", error);
+
+    console.log("🎵 TikTok: Found advertiser IDs:", ids);
+    return ids;
+  } catch (error: any) {
+    console.error("🎵 TikTok: Failed to fetch advertiser list:", error.message);
     return undefined;
   }
 }

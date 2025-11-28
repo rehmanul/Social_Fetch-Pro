@@ -445,7 +445,21 @@ export async function scrapeTikTok(username: string) {
         throw new Error(`TikTok returned status ${response.status} - user may not exist or profile is private`);
       }
 
+      console.log("🎵 TikTok: Response size:", response.data.length, "bytes");
+      console.log("🎵 TikTok: Response preview:", response.data.substring(0, 500));
+
       const $ = cheerio.load(response.data);
+      const scriptCount = $('script').length;
+      console.log("🎵 TikTok: Found", scriptCount, "script tags");
+
+      // Check if we got a login/blocked page
+      const pageTitle = $('title').text();
+      console.log("🎵 TikTok: Page title:", pageTitle);
+
+      if (pageTitle.toLowerCase().includes('login') || response.data.includes('Please verify')) {
+        throw new Error("TikTok blocked the request - cookies invalid/expired or IP blocked");
+      }
+
       let payload: any | null = null;
 
       // Method 1: Try SIGI_STATE script tag
