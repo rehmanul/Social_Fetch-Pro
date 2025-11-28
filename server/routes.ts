@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { insertJobSchema, insertTwitterAccountSchema, insertInstagramCredentialSchema, settingsSchema } from "@shared/schema";
 import { z } from "zod";
 import { scrapeYouTube, scrapeTikTok, scrapeTwitter, scrapeInstagram } from "./scrapers";
-import { buildTikTokAuthUrl, exchangeAuthCode, refreshTikTokToken, fetchAdvertiserInfo, tiktokStatus } from "./tiktok-api";
+import { buildTikTokAuthUrl, exchangeAuthCode, refreshTikTokToken, fetchAdvertiserInfo, tiktokStatus, writeTikTokTokens, type TikTokTokenBundle } from "./tiktok-api";
 import { registerMetadataRoutes } from "./metadata-routes";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -160,6 +160,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       res.status(400).json({ error: error.message || "Failed to refresh TikTok token" });
+    }
+  });
+
+  app.post("/api/tiktok/token/manual", async (req, res) => {
+    try {
+      const { accessToken, refreshToken, expiresIn, scope } = req.body || {};
+
+      if (!accessToken || typeof accessToken !== "string") {
+        return res.status(400).json({ error: "accessToken is required" });
+      }
+
+      const bundle: TikTokTokenBundle = {
+        accessToken,
+        refreshToken: refreshToken || undefined,
+        expiresIn: typeof expiresIn === "number" ? expiresIn : 86400,
+        expiresAt: buildExpiresAt(typeof expiresIn === "number" ? expiresIn : 86400),
+        scope: scope ? String(scope).split(",") : undefined,
+        advertiserIds: await fetchAdvertiserIds(accessToken),
+        obtainedAt: new Date().toISOString(),
+        source: "manual_env",
+      };
+
+      writeTikTokTokens(bundle);
+
+      res.json({
+        success: true,
+        expiresAt: bundle.expiresAt,
+        advertiserIds: bundle.advertiserIds,
+        hasRefreshToken: !!bundle.refreshToken,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Failed to save manual token" });
     }
   });
 

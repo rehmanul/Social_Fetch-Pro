@@ -113,12 +113,12 @@ export async function exchangeAuthCode(authCode: string, state?: string): Promis
 
   const base = getTikTokBaseUrl();
   const response = await axios.post(
-    `${base}/v1.3/oauth2/token/`,
+    `${base}/v1.3/oauth2/access_token/`,
     {
       app_id: appId,
       secret: appSecret,
       auth_code: authCode,
-      grant_type: "auth_code",
+      grant_type: "authorization_code",
     },
     { timeout: 15000 },
   );
@@ -161,7 +161,7 @@ export async function refreshTikTokToken(manualRefreshToken?: string): Promise<T
 
   const base = getTikTokBaseUrl();
   const response = await axios.post(
-    `${base}/v1.3/oauth2/token/`,
+    `${base}/v1.3/oauth2/access_token/`,
     {
       app_id: appId,
       secret: appSecret,
