@@ -57,17 +57,12 @@ export function buildTikTokAuthUrl(state?: string): string {
     throw new Error("TIKTOK_APP_ID and TIKTOK_REDIRECT_URI must be configured");
   }
 
-  // Request all common TikTok Marketing API scopes
-  // 1 = Ad Account Management (CRITICAL - needed to fetch advertiser list)
-  // 2 = Campaign Management
-  // 3,4,5,6,7,8 = Reporting, Creative, Audience, etc.
-  const scopes = "1,2,3,4,5,6,7,8";
-
   const params = new URLSearchParams({
     app_id: appId,
     state: state || "social-fetch-pro",
     redirect_uri: redirectUri,
-    scope: scopes,
+    // Don't specify scope parameter - let TikTok show all approved scopes for the app
+    // The user can then approve all scopes they want during authorization
   });
 
   // Portal auth always uses the business-api host, even when sandboxing API calls
