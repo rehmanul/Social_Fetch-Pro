@@ -5,6 +5,7 @@ import { insertJobSchema, insertTwitterAccountSchema, insertInstagramCredentialS
 import { z } from "zod";
 import { scrapeYouTube, scrapeTikTok, scrapeTwitter, scrapeInstagram } from "./scrapers";
 import { buildTikTokAuthUrl, exchangeAuthCode, refreshTikTokToken, fetchAdvertiserInfo, tiktokStatus } from "./tiktok-api";
+import { registerMetadataRoutes } from "./metadata-routes";
 
 export async function registerRoutes(app: Express): Promise<Server> {
 
@@ -421,6 +422,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: error.message || "TikTok scraping failed" });
     }
   });
+
+  // Register enhanced metadata scraping routes (v2 API)
+  registerMetadataRoutes(app);
 
   const httpServer = createServer(app);
   return httpServer;
