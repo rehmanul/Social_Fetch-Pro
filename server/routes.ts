@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { insertJobSchema, insertTwitterAccountSchema, insertInstagramCredentialSchema, settingsSchema } from "@shared/schema";
 import { z } from "zod";
 import { scrapeYouTube, scrapeTikTok, scrapeTwitter, scrapeInstagram } from "./scrapers";
+import { buildTikTokAuthUrl, exchangeAuthCode, refreshTikTokToken, fetchAdvertiserInfo, tiktokStatus } from "./tiktok-api";
 
 export async function registerRoutes(app: Express): Promise<Server> {
 
@@ -16,6 +17,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const jobs = await storage.getAllJobs();
       const twitterAccounts = await storage.getTwitterAccounts();
       const instagramAccount = await storage.getInstagramCredential();
+      const tiktok = tiktokStatus();
       
       const completedJobs = jobs.filter(j => j.status === "completed");
       const successRate = jobs.length > 0 
@@ -23,7 +25,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : 0;
       
       const activeAccounts = twitterAccounts.filter(a => a.status === "active").length + 
-        (instagramAccount && instagramAccount.status === "active" ? 1 : 0);
+        (instagramAccount && instagramAccount.status === "active" ? 1 : 0) +
+        (tiktok.hasStoredToken ? 1 : 0);
       
       const dataVolume = `${Math.round(JSON.stringify(jobs).length / 1024 / 1024 * 100) / 100} MB`;
 
@@ -87,6 +90,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: error.errors });
       }
       res.status(500).json({ error: "Failed to update settings" });
+    }
+  });
+
+  app.get("/api/tiktok/auth-url", (req, res) => {
+    try {
+      const state = typeof req.query.state === "string" ? req.query.state : undefined;
+      const url = buildTikTokAuthUrl(state);
+      res.json({ url, state: state || "social-fetch-pro" });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Failed to build TikTok auth URL" });
+    }
+  });
+
+  app.get("/oauth-callback", async (req, res) => {
+    try {
+      const { auth_code, code, state, error, error_description } = req.query;
+      if (error) {
+        return res.status(400).send(`TikTok authorization failed: ${error_description || error}`);
+      }
+
+      const authCode =
+        typeof auth_code === "string"
+          ? auth_code
+          : typeof code === "string"
+            ? code
+            : undefined;
+
+      if (!authCode) {
+        return res.status(400).send("Missing auth_code parameter from TikTok");
+      }
+
+      const bundle = await exchangeAuthCode(
+        authCode,
+        typeof state === "string" ? state : undefined,
+      );
+      const advertiserIds = bundle.advertiserIds?.join(", ") || "none returned";
+      const expires = bundle.expiresAt || "unknown";
+
+      const successHtml = `
+        <html>
+          <body style="font-family: Arial, sans-serif; padding: 24px;">
+            <h2>TikTok authorization saved</h2>
+            <p>Access token stored successfully.</p>
+            <p><strong>Advertiser IDs:</strong> ${advertiserIds}</p>
+            <p><strong>Expires:</strong> ${expires}</p>
+            <p>You may close this tab.</p>
+          </body>
+        </html>`;
+      res.send(successHtml);
+    } catch (error: any) {
+      res.status(500).send(`Failed to exchange TikTok auth_code: ${error.message}`);
+    }
+  });
+
+  app.get("/api/tiktok/status", (_req, res) => {
+    res.json(tiktokStatus());
+  });
+
+  app.post("/api/tiktok/token/refresh", async (req, res) => {
+    try {
+      const { refreshToken } = req.body || {};
+      const bundle = await refreshTikTokToken(refreshToken);
+      res.json({
+        expiresAt: bundle.expiresAt,
+        advertiserIds: bundle.advertiserIds,
+        source: bundle.source,
+      });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Failed to refresh TikTok token" });
+    }
+  });
+
+  app.post("/api/tiktok/advertiser/info", async (req, res) => {
+    try {
+      const advertiserId = typeof req.body?.advertiserId === "string" ? req.body.advertiserId : undefined;
+      const info = await fetchAdvertiserInfo(advertiserId);
+      res.json(info);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Failed to fetch TikTok advertiser info" });
     }
   });
 
@@ -293,6 +375,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
         jobId: job.id,
         status: "completed",
         result,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "TikTok scraping failed" });
+    }
+  });
+
+  // TikTok fetch with query params: /api/tiktok?username=foo&page=1&per-page=10
+  app.get("/api/tiktok", async (req, res) => {
+    try {
+      const username = typeof req.query.username === "string" ? req.query.username : undefined;
+      if (!username) {
+        return res.status(400).json({ error: "Username is required" });
+      }
+
+      const pageParam = typeof req.query.page === "string" ? Number.parseInt(req.query.page, 10) : 1;
+      const perPageParamRaw =
+        (typeof req.query["per-page"] === "string" && req.query["per-page"]) ||
+        (typeof req.query.per_page === "string" && req.query.per_page);
+      const perPageParam = perPageParamRaw ? Number.parseInt(perPageParamRaw, 10) : 10;
+
+      const page = Number.isNaN(pageParam) || pageParam < 1 ? 1 : pageParam;
+      const perPage = Number.isNaN(perPageParam) || perPageParam < 1 ? 10 : Math.min(perPageParam, 50);
+
+      const result = await scrapeTikTok(username);
+      const items = Array.isArray((result as any)?.data) ? (result as any).data : [];
+      const total = items.length;
+      const offset = (page - 1) * perPage;
+      const data = items.slice(offset, offset + perPage);
+      const totalPages = Math.max(1, Math.ceil(total / perPage));
+
+      return res.json({
+        meta: {
+          ...(result as any)?.meta,
+          username,
+          page,
+          per_page: perPage,
+          total_pages: totalPages,
+          total_posts: total,
+        },
+        data,
+        status: (result as any)?.status ?? "success",
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message || "TikTok scraping failed" });

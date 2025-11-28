@@ -19,6 +19,17 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
+type TikTokStatus = {
+  baseUrl: string;
+  hasStoredToken: boolean;
+  expiresAt?: string;
+  advertiserIds?: string[];
+  source?: string;
+  redirectUri?: string;
+  appId?: string;
+  sandbox?: boolean;
+};
+
 export default function Accounts() {
   const [isTwitterDialogOpen, setIsTwitterDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -29,6 +40,10 @@ export default function Accounts() {
 
   const { data: instagramAccount, isLoading: instagramLoading } = useQuery<InstagramCredential>({
     queryKey: ["/api/accounts/instagram"],
+  });
+
+  const { data: tiktokStatus, isLoading: tiktokLoading, refetch: refetchTikTok } = useQuery<TikTokStatus>({
+    queryKey: ["/api/tiktok/status"],
   });
 
   const addTwitterAccountMutation = useMutation({
@@ -92,6 +107,27 @@ export default function Accounts() {
     });
   };
 
+  const handleTikTokConnect = async () => {
+    try {
+      const res = await apiRequest("GET", "/api/tiktok/auth-url");
+      const data = await res.json();
+      if (!data?.url) {
+        throw new Error("Auth URL unavailable");
+      }
+      window.open(data.url, "_blank", "noopener,noreferrer");
+      toast({
+        title: "TikTok authorization",
+        description: "Complete the TikTok consent flow in the new tab, then refresh status here.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Failed to start TikTok auth",
+        description: error.message || "Unknown error",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "active":
@@ -119,6 +155,7 @@ export default function Accounts() {
         <TabsList data-testid="tabs-accounts">
           <TabsTrigger value="twitter" data-testid="tab-twitter">Twitter Accounts</TabsTrigger>
           <TabsTrigger value="instagram" data-testid="tab-instagram">Instagram Account</TabsTrigger>
+          <TabsTrigger value="tiktok" data-testid="tab-tiktok">TikTok Business</TabsTrigger>
         </TabsList>
 
         <TabsContent value="twitter" className="mt-6">
@@ -304,6 +341,70 @@ export default function Accounts() {
                     {updateInstagramMutation.isPending ? "Saving..." : "Save Credentials"}
                   </Button>
                 </form>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="tiktok" className="mt-6">
+          <Card>
+            <CardHeader className="flex flex-col gap-2">
+              <CardTitle className="text-lg font-medium">TikTok Business Access</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Connect the official TikTok Business API. Once authorized, access is marked active.
+              </p>
+            </CardHeader>
+            <CardContent>
+              {tiktokLoading ? (
+                <Skeleton className="h-32" />
+              ) : tiktokStatus ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <Badge variant={tiktokStatus.hasStoredToken ? "secondary" : "outline"}>
+                      {tiktokStatus.hasStoredToken ? "Active" : "Not connected"}
+                    </Badge>
+                    {tiktokStatus.sandbox && <Badge variant="outline">Sandbox</Badge>}
+                  </div>
+                  <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+                    <div>
+                      <p className="text-foreground font-medium">Base URL</p>
+                      <p className="break-all">{tiktokStatus.baseUrl}</p>
+                    </div>
+                    <div>
+                      <p className="text-foreground font-medium">Advertisers</p>
+                      <p>{tiktokStatus.advertiserIds?.join(", ") || "None yet"}</p>
+                    </div>
+                    <div>
+                      <p className="text-foreground font-medium">Expires</p>
+                      <p>{tiktokStatus.expiresAt ? new Date(tiktokStatus.expiresAt).toLocaleString() : "Unknown"}</p>
+                    </div>
+                    <div>
+                      <p className="text-foreground font-medium">Source</p>
+                      <p>{tiktokStatus.source || "N/A"}</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    <Button size="sm" onClick={handleTikTokConnect} data-testid="button-connect-tiktok">
+                      {tiktokStatus.hasStoredToken ? "Reconnect / Rotate" : "Connect TikTok"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => refetchTikTok()}
+                      data-testid="button-refresh-tiktok-status"
+                    >
+                      Refresh status
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-10 space-y-3">
+                  <AlertCircle className="h-10 w-10 text-muted-foreground/50" />
+                  <p className="text-sm text-muted-foreground text-center">
+                    Unable to load TikTok status. Check server logs and retry.
+                  </p>
+                  <Button size="sm" onClick={() => refetchTikTok()}>Retry</Button>
+                </div>
               )}
             </CardContent>
           </Card>

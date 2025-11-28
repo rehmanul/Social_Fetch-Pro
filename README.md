@@ -21,6 +21,12 @@ See [AGENTS.md](AGENTS.md) for contributor rules and production standards.
    npm run dev
    ```
 
+## TikTok Business API (official)
+- Populate `TIKTOK_APP_ID`, `TIKTOK_APP_SECRET`, `TIKTOK_REDIRECT_URI`, and optionally `TIKTOK_ADVERTISER_ID` in `.env`. Set `TIKTOK_USE_SANDBOX=true` to call the sandbox host or override with `TIKTOK_API_BASE`.
+- Get the portal link from `GET /api/tiktok/auth-url` (supports an optional `state` query). Complete consent and the `/oauth-callback` route will exchange the `auth_code` and cache tokens to `.data/tiktok_tokens.json`.
+- Check the stored token with `GET /api/tiktok/status`, refresh with `POST /api/tiktok/token/refresh`, and pull advertiser details via `POST /api/tiktok/advertiser/info` with an optional `advertiserId` in the JSON body.
+- Keep the `.data/` folder on a persistent disk in production; never commit tokens or app secrets to Git.
+
 ## Production build
 ```bash
 npm run build
