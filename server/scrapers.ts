@@ -467,6 +467,19 @@ export async function scrapeTikTok(username: string) {
         }
       }
 
+      // Method 1.5: Try __UNIVERSAL_DATA_FOR_REHYDRATION__ script tag
+      if (!payload) {
+        const universalRaw = $('script#__UNIVERSAL_DATA_FOR_REHYDRATION__').first().html();
+        if (universalRaw) {
+          try {
+            payload = JSON.parse(universalRaw);
+            console.log("🎵 TikTok: Parsed data from __UNIVERSAL_DATA_FOR_REHYDRATION__ script tag");
+          } catch (e) {
+            console.log("🎵 TikTok: __UNIVERSAL_DATA_FOR_REHYDRATION__ found but failed to parse");
+          }
+        }
+      }
+
       // Method 2: Try __UNIVERSAL_DATA_FOR_REHYDRATION__ with improved regex
       if (!payload) {
         const patterns = [

@@ -237,6 +237,10 @@ class ProxyManager {
         const response = await axios(config);
         const responseTime = Date.now() - startTime;
 
+        console.log(`   Response status: ${response.status}`);
+        console.log(`   Response size: ${typeof response.data === "string" ? response.data.length : "N/A"} bytes`);
+        console.log(`   Response preview: ${typeof response.data === "string" ? response.data.substring(0, 200) : "Non-string response"}`);
+
         // Check if response is valid (not blocked/empty)
         const isValid = this.validateResponse(response.data, response.status);
 
@@ -251,6 +255,7 @@ class ProxyManager {
           };
         } else {
           console.log(`⚠️  Response invalid with ${strategy.name} strategy - trying next`);
+          console.log(`   Validation failed: status=${response.status}, type=${typeof response.data}`);
           this.updateStrategy(strategy.name, false, responseTime);
         }
       } catch (error: any) {
@@ -283,26 +288,61 @@ class ProxyManager {
    * Validate if response contains actual content (not blocked/empty)
    */
   private validateResponse(data: any, status: number): boolean {
+    console.log(`   Validation step 1: status=${status}`);
     if (status !== 200) {
       return false;
     }
 
+    console.log(`   Validation step 2: typeof data=${typeof data}`);
     if (typeof data !== "string") {
       return true; // JSON responses are usually valid
     }
 
-    // Check for common blocking indicators
-    if (
-      data.toLowerCase().includes("please verify") ||
-      data.toLowerCase().includes("captcha") ||
-      data.length < 1000 // Suspiciously short HTML
-    ) {
+    console.log(`   Validation step 3: data.length=${data.length}`);
+
+    // Check for common blocking indicators (actual blocking, not just URLs containing these words)
+    const lowerData = data.toLowerCase();
+
+    const hasVerify = lowerData.includes("please verify") && lowerData.includes("human");
+    // Only reject if it's an actual CAPTCHA challenge (title or prominent text), not just config/URLs
+    const hasCaptcha = lowerData.includes("<title>captcha") || lowerData.includes("complete the captcha");
+    const tooShort = data.length < 1000;
+
+    console.log(`   Validation step 4: hasVerify=${hasVerify}, hasCaptcha=${hasCaptcha}, tooShort=${tooShort}`);
+
+    // Check for actual CAPTCHA/verification pages
+    if (hasVerify || hasCaptcha || tooShort) {
       return false;
     }
 
     // Check if HTML contains meaningful script tags
-    if (data.includes("<html") && !data.includes("<script")) {
+    const hasHtml = data.includes("<html");
+    const hasScript = data.includes("<script");
+    console.log(`   Validation step 5: hasHtml=${hasHtml}, hasScript=${hasScript}`);
+
+    if (hasHtml && !hasScript) {
       return false; // HTML without any scripts is suspicious
+    }
+
+    // For TikTok specifically, check for actual data presence
+    if (data.includes("tiktok")) {
+      const hasSIGI = data.includes("SIGI_STATE");
+      const hasUniversalData = data.includes("__UNIVERSAL_DATA_FOR_REHYDRATION__");
+      const hasItemModule = data.includes("ItemModule");
+
+      console.log(`   TikTok data check: SIGI=${hasSIGI}, UNIVERSAL=${hasUniversalData}, ItemModule=${hasItemModule}`);
+
+      // Look for the data we need to parse
+      if (hasSIGI || hasUniversalData || hasItemModule) {
+        return true; // Has TikTok data structures
+      }
+
+      // Check for login requirement (actual login page, not just meta tags)
+      const isLoginPage = data.includes("<title>Log in") || data.includes("<title>Sign up");
+      console.log(`   Is login page: ${isLoginPage}`);
+      if (isLoginPage) {
+        return false; // Actual login page
+      }
     }
 
     return true;
