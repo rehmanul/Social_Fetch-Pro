@@ -4,8 +4,9 @@ import { storage } from "./storage";
 import { insertJobSchema, insertTwitterAccountSchema, insertInstagramCredentialSchema, settingsSchema } from "@shared/schema";
 import { z } from "zod";
 import { scrapeYouTube, scrapeTikTok, scrapeTwitter, scrapeInstagram } from "./scrapers";
-import { buildTikTokAuthUrl, exchangeAuthCode, refreshTikTokToken, fetchAdvertiserInfo, tiktokStatus, writeTikTokTokens, type TikTokTokenBundle } from "./tiktok-api";
+import { buildTikTokAuthUrl, exchangeAuthCode, refreshTikTokToken, fetchAdvertiserInfo, tiktokStatus, writeTikTokTokens, buildExpiresAt, fetchAdvertiserIds, type TikTokTokenBundle } from "./tiktok-api";
 import { registerMetadataRoutes } from "./metadata-routes";
+import { proxyManager } from "./proxy-manager";
 
 export async function registerRoutes(app: Express): Promise<Server> {
 
@@ -19,16 +20,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const twitterAccounts = await storage.getTwitterAccounts();
       const instagramAccount = await storage.getInstagramCredential();
       const tiktok = tiktokStatus();
-      
+
       const completedJobs = jobs.filter(j => j.status === "completed");
-      const successRate = jobs.length > 0 
-        ? Math.round((completedJobs.length / jobs.length) * 100) 
+      const successRate = jobs.length > 0
+        ? Math.round((completedJobs.length / jobs.length) * 100)
         : 0;
-      
-      const activeAccounts = twitterAccounts.filter(a => a.status === "active").length + 
+
+      const activeAccounts = twitterAccounts.filter(a => a.status === "active").length +
         (instagramAccount && instagramAccount.status === "active" ? 1 : 0) +
         (tiktok.hasStoredToken ? 1 : 0);
-      
+
       const dataVolume = `${Math.round(JSON.stringify(jobs).length / 1024 / 1024 * 100) / 100} MB`;
 
       res.json({
@@ -39,6 +40,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch stats" });
+    }
+  });
+
+  app.get("/api/proxy/stats", (_req, res) => {
+    try {
+      const statistics = proxyManager.getStatistics();
+      const brightDataAvailable = proxyManager.isBrightDataAvailable();
+
+      res.json({
+        brightDataAvailable,
+        strategies: statistics,
+        summary: Object.values(statistics).map(strategy => {
+          const total = strategy.successCount + strategy.failureCount;
+          const successRate = total > 0 ? Math.round((strategy.successCount / total) * 100) : 0;
+          return {
+            name: strategy.name,
+            successRate: `${successRate}%`,
+            totalRequests: total,
+            avgResponseTime: `${Math.round(strategy.avgResponseTime)}ms`,
+            lastUsed: new Date(strategy.lastUsed).toISOString(),
+          };
+        }),
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch proxy stats" });
     }
   });
 

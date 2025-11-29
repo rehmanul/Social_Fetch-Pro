@@ -69,7 +69,7 @@ export function buildTikTokAuthUrl(state?: string): string {
   return `https://business-api.tiktok.com/portal/auth?${params.toString()}`;
 }
 
-function buildExpiresAt(expiresIn?: number): string | undefined {
+export function buildExpiresAt(expiresIn?: number): string | undefined {
   if (!expiresIn || expiresIn <= 0) return undefined;
   const ms = expiresIn * 1000;
   return new Date(Date.now() + ms).toISOString();
@@ -82,7 +82,7 @@ export function isAccessTokenExpired(bundle: TikTokTokenBundle): boolean {
   return expiresAtMs - 60000 <= Date.now();
 }
 
-async function fetchAdvertiserIds(accessToken: string): Promise<string[] | undefined> {
+export async function fetchAdvertiserIds(accessToken: string): Promise<string[] | undefined> {
   try {
     const base = getTikTokBaseUrl();
     console.log("🎵 TikTok: Fetching advertiser list");

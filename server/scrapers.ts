@@ -1,5 +1,6 @@
 import axios from "axios";
 import * as cheerio from "cheerio";
+import { proxyManager } from "./proxy-manager";
 
 const USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36";
 
@@ -423,30 +424,23 @@ export async function scrapeTikTok(username: string) {
     console.log("🎵 TikTok: Starting scrape for @" + handle, "with cookies:", tiktokCookie && tiktokSessionId ? "✓" : "✗");
 
     try {
-      // Scrape TikTok profile and parse the pre-rendered SIGI_STATE payload
-      const response = await axios.get(`https://www.tiktok.com/@${handle}`, {
+      // Use advanced proxy manager with intelligent fallback
+      console.log("🎵 TikTok: Using advanced scraping system with intelligent proxy management");
+      console.log("🎵 TikTok: Bright Data available:", proxyManager.isBrightDataAvailable() ? "✓" : "✗");
+
+      const result = await proxyManager.makeRequest(`https://www.tiktok.com/@${handle}`, {
         headers: {
-          "User-Agent": USER_AGENT,
           Cookie: combinedCookie,
-          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-          "Accept-Language": "en-US,en;q=0.9",
-          Referer: "https://www.tiktok.com/",
         },
-        timeout: 20000,
-        maxRedirects: 0,
-        validateStatus: (status) => status < 400,
+        maxRetries: 3,
+        retryStrategies: true,
       });
 
-      if (response.status === 302) {
-        throw new Error("TikTok redirected to login - cookies may be invalid/expired");
-      }
+      console.log(`🎵 TikTok: Request succeeded via ${result.strategy} strategy (${result.responseTime}ms)`);
+      console.log("🎵 TikTok: Response size:", result.data.length, "bytes");
+      console.log("🎵 TikTok: Response preview:", result.data.substring(0, 500));
 
-      if (response.status !== 200) {
-        throw new Error(`TikTok returned status ${response.status} - user may not exist or profile is private`);
-      }
-
-      console.log("🎵 TikTok: Response size:", response.data.length, "bytes");
-      console.log("🎵 TikTok: Response preview:", response.data.substring(0, 500));
+      const response = { data: result.data, status: 200 };
 
       const $ = cheerio.load(response.data);
       const scriptCount = $('script').length;
