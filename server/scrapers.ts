@@ -37,17 +37,30 @@ function extractCookieValue(cookieHeader: string, key: string): string | undefin
   return value || undefined;
 }
 
-// ============ YOUTUBE SCRAPER (COOKIE-BASED) ============
+// ============ YOUTUBE SCRAPER (ENHANCED WITH API v3 SUPPORT) ============
 export async function scrapeYouTube(channelName: string) {
   try {
     const channel = normalizeHandle(channelName);
+
+    // Try enhanced scraper first (includes API v3 and InnerTube methods)
+    if (process.env.YOUTUBE_API_KEY || process.env.YOUTUBE_COOKIE) {
+      try {
+        console.log("🎥 YouTube: Using enhanced scraper with priority fallback");
+        const { scrapeYouTubeEnhanced } = await import("./scrapers/youtube-enhanced.js");
+        return await scrapeYouTubeEnhanced(channel);
+      } catch (error: any) {
+        console.warn("🎥 YouTube: Enhanced scraper failed, falling back to basic cookie scraper:", error.message);
+      }
+    }
+
+    // Fallback to basic cookie scraper
     const youtubeCookie = process.env.YOUTUBE_COOKIE;
     if (!youtubeCookie) {
       throw new Error("YOUTUBE_COOKIE not configured - add it to environment secrets from a signed-in YouTube session.");
     }
 
     const sanitizedCookie = buildCookieHeader([youtubeCookie]);
-    console.log("🎥 YouTube: Starting scrape for", channel, "with cookies:", sanitizedCookie ? "✓" : "✗");
+    console.log("🎥 YouTube: Starting basic scrape for", channel, "with cookies:", sanitizedCookie ? "✓" : "✗");
 
     try {
       const response = await axios.get(`https://www.youtube.com/@${channel}/videos`, {
@@ -113,7 +126,7 @@ export async function scrapeYouTube(channelName: string) {
           page: 1,
           total_pages: 1,
           total_videos: videos.length,
-          fetch_method: "youtube_cookie_scrape_real",
+          fetch_method: "youtube_cookie_scrape_basic",
           status: "success",
         },
         data: videos,
@@ -129,17 +142,30 @@ export async function scrapeYouTube(channelName: string) {
   }
 }
 
-// ============ TWITTER SCRAPER (COOKIE-BASED) ============
+// ============ TWITTER SCRAPER (ENHANCED WITH API v2 & GRAPHQL SUPPORT) ============
 export async function scrapeTwitter(username: string) {
   try {
     const handle = normalizeHandle(username);
+
+    // Try enhanced scraper first (includes API v2 and enhanced GraphQL methods)
+    if (process.env.TWITTER_API_V2_BEARER_TOKEN || (process.env.TWITTER_BEARER_TOKEN && process.env.TWITTER_COOKIE)) {
+      try {
+        console.log("🐦 Twitter: Using enhanced scraper with priority fallback");
+        const { scrapeTwitterEnhanced } = await import("./scrapers/twitter-enhanced.js");
+        return await scrapeTwitterEnhanced(handle);
+      } catch (error: any) {
+        console.warn("🐦 Twitter: Enhanced scraper failed, falling back to basic cookie scraper:", error.message);
+      }
+    }
+
+    // Fallback to basic cookie scraper
     const twitterCookie = process.env.TWITTER_COOKIE;
     if (!twitterCookie) {
       throw new Error("TWITTER_COOKIE not configured - add it to environment secrets from a logged-in Twitter session.");
     }
 
     const sanitizedCookie = buildCookieHeader([twitterCookie]);
-    console.log("🐦 Twitter: Starting scrape for @" + handle, "with cookies:", sanitizedCookie ? "✓" : "✗");
+    console.log("🐦 Twitter: Starting basic scrape for @" + handle, "with cookies:", sanitizedCookie ? "✓" : "✗");
 
     try {
       // Scrape Twitter profile
@@ -307,7 +333,7 @@ export async function scrapeTwitter(username: string) {
           page: 1,
           total_pages: 1,
           total_tweets: tweets.length,
-          fetch_method: "twitter_cookie_scrape_real",
+          fetch_method: "twitter_cookie_scrape_basic",
           status: "success",
         },
         data: tweets,
