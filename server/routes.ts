@@ -145,6 +145,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Alternative callback path for different TikTok apps
+  app.get("/tiktok/callback", async (req, res) => {
+    try {
+      const { auth_code, code, state, error, error_description } = req.query;
+      if (error) {
+        return res.status(400).send(`TikTok authorization failed: ${error_description || error}`);
+      }
+
+      const authCode =
+        typeof auth_code === "string"
+          ? auth_code
+          : typeof code === "string"
+            ? code
+            : undefined;
+
+      if (!authCode) {
+        return res.status(400).send("Missing auth_code parameter from TikTok");
+      }
+
+      const bundle = await exchangeAuthCode(
+        authCode,
+        typeof state === "string" ? state : undefined,
+      );
+      const advertiserIds = bundle.advertiserIds?.join(", ") || "none returned";
+      const expires = bundle.expiresAt || "unknown";
+
+      const successHtml = `
+        <html>
+          <body style="font-family: Arial, sans-serif; padding: 24px;">
+            <h2>TikTok authorization saved</h2>
+            <p>Access token stored successfully.</p>
+            <p><strong>Advertiser IDs:</strong> ${advertiserIds}</p>
+            <p><strong>Expires:</strong> ${expires}</p>
+            <p>You may close this tab.</p>
+          </body>
+        </html>`;
+      res.send(successHtml);
+    } catch (error: any) {
+      res.status(500).send(`Failed to exchange TikTok auth_code: ${error.message}`);
+    }
+  });
+
   app.get("/api/tiktok/status", (_req, res) => {
     res.json(tiktokStatus());
   });
