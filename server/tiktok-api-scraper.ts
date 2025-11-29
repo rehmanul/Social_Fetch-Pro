@@ -4,7 +4,7 @@
  */
 
 import axios from "axios";
-import { proxyManager } from "./proxy-manager";
+import { proxyManager } from "./proxy-manager-simple";
 
 interface TikTokVideo {
   video_id: string;

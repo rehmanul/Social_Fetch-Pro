@@ -6,7 +6,7 @@ import { z } from "zod";
 import { scrapeYouTube, scrapeTikTok, scrapeTwitter, scrapeInstagram } from "./scrapers";
 import { buildTikTokAuthUrl, exchangeAuthCode, refreshTikTokToken, fetchAdvertiserInfo, tiktokStatus, writeTikTokTokens, buildExpiresAt, fetchAdvertiserIds, type TikTokTokenBundle } from "./tiktok-api";
 import { registerMetadataRoutes } from "./metadata-routes";
-import { proxyManager } from "./proxy-manager";
+import { proxyManager } from "./proxy-manager-simple";
 
 export async function registerRoutes(app: Express): Promise<Server> {
 
