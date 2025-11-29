@@ -50,6 +50,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({
         brightDataAvailable,
+        useBrightDataDefault: process.env.USE_BRIGHTDATA === "true",
+        hasBrowserUrl: !!process.env.BRIGHTDATA_BROWSER_URL,
+        hasProxyUrl: !!process.env.BRIGHTDATA_PROXY_URL,
         strategies: statistics,
         summary: Object.values(statistics).map(strategy => {
           const total = strategy.successCount + strategy.failureCount;

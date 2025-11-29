@@ -257,6 +257,12 @@ class ProxyManager {
         const responseTime = Date.now() - startTime;
         this.updateStrategy(strategy.name, false, responseTime);
         console.log(`❌ Strategy ${strategy.name} failed:`, error.message);
+        if (error.code) {
+          console.log(`   Error code: ${error.code}`);
+        }
+        if (strategy.name === "proxy" && error.message.includes("Proxy")) {
+          console.log(`   ⚠️  Proxy connection issue - check if Bright Data zone is configured for HTTP proxy (not browser automation)`);
+        }
         lastError = error;
       }
 
