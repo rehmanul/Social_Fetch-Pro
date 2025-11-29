@@ -31,8 +31,28 @@ class ProxyManager {
   private readonly useBrightDataDefault: boolean;
 
   constructor() {
-    this.brightDataUrl = process.env.BRIGHTDATA_BROWSER_URL;
+    // Convert WebSocket browser URL to HTTP proxy URL
+    const browserUrl = process.env.BRIGHTDATA_BROWSER_URL;
+    if (browserUrl && browserUrl.startsWith("wss://")) {
+      // Extract credentials and host from wss://username:password@host:port
+      const match = browserUrl.match(/wss:\/\/([^@]+)@([^:]+):(\d+)/);
+      if (match) {
+        const [, credentials, host] = match;
+        // Use standard Bright Data HTTP proxy port (22225)
+        this.brightDataUrl = `http://${credentials}@${host}:22225`;
+        console.log("🔄 ProxyManager: Converted Bright Data URL to HTTP proxy format");
+      } else {
+        this.brightDataUrl = undefined;
+        console.log("⚠️  ProxyManager: Failed to parse Bright Data URL");
+      }
+    } else {
+      this.brightDataUrl = process.env.BRIGHTDATA_PROXY_URL || browserUrl;
+      if (this.brightDataUrl) {
+        console.log("🔄 ProxyManager: Using proxy URL from BRIGHTDATA_PROXY_URL");
+      }
+    }
     this.useBrightDataDefault = process.env.USE_BRIGHTDATA === "true";
+    console.log(`🔄 ProxyManager initialized: Bright Data ${this.brightDataUrl ? "available" : "not available"}, default: ${this.useBrightDataDefault ? "proxy" : "direct"}`);
   }
 
   /**
@@ -159,9 +179,7 @@ class ProxyManager {
     }
 
     if (useProxy && this.brightDataUrl) {
-      // Convert wss:// to https:// for proxy agent
-      const proxyUrl = this.brightDataUrl.replace("wss://", "https://");
-      config.httpsAgent = new HttpsProxyAgent(proxyUrl);
+      config.httpsAgent = new HttpsProxyAgent(this.brightDataUrl);
       config.proxy = false; // Disable axios default proxy handling
     }
 
