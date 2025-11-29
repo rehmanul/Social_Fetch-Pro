@@ -410,23 +410,45 @@ export async function scrapeInstagram(username: string) {
   }
 }
 
-// ============ TIKTOK SCRAPER (COOKIE-BASED) ============
+// ============ TIKTOK SCRAPER (COOKIE-BASED API) ============
+// TikTok no longer includes videos in HTML - using cookie-authenticated API endpoints
 export async function scrapeTikTok(username: string) {
+  try {
+    const handle = normalizeHandle(username);
+
+    console.log("🎵 TikTok: Starting cookie-based API scraping for @" + handle);
+
+    // Use cookie-based API scraper
+    const { scrapeTikTokAPI } = await import("./tiktok-api-scraper.js");
+    const result = await scrapeTikTokAPI(handle);
+
+    console.log("🎵 TikTok: API scraping completed:", result.data.length, "videos");
+
+    return result;
+  } catch (error: any) {
+    console.error("🎵 TikTok error:", error.message);
+    throw error;
+  }
+}
+
+// ============ TIKTOK SCRAPER BACKUP (HTML/API - NOT WORKING) ============
+// Keeping this for reference, but TikTok no longer serves videos via HTML
+export async function scrapeTikTokLegacy(username: string) {
   try {
     const handle = normalizeHandle(username);
     const tiktokCookie = process.env.TIKTOK_COOKIE;
     const tiktokSessionId = process.env.TIKTOK_SESSION_ID;
     if (!tiktokCookie || !tiktokSessionId) {
-      throw new Error("TIKTOK_COOKIE or TIKTOK_SESSION_ID not configured - add them to Replit secrets. Get from TikTok browser session.");
+      throw new Error("TIKTOK_COOKIE or TIKTOK_SESSION_ID not configured - add them to environment secrets.");
     }
 
     const combinedCookie = buildCookieHeader([`sessionid=${tiktokSessionId}`, tiktokCookie]);
-    console.log("🎵 TikTok: Starting scrape for @" + handle, "with cookies:", tiktokCookie && tiktokSessionId ? "✓" : "✗");
+    console.log("🎵 TikTok Legacy: Starting scrape for @" + handle, "with cookies:", tiktokCookie && tiktokSessionId ? "✓" : "✗");
 
     try {
       // Use advanced proxy manager with intelligent fallback
-      console.log("🎵 TikTok: Using advanced scraping system with intelligent proxy management");
-      console.log("🎵 TikTok: Bright Data available:", proxyManager.isBrightDataAvailable() ? "✓" : "✗");
+      console.log("🎵 TikTok Legacy: Using advanced scraping system");
+      console.log("🎵 TikTok Legacy: Bright Data available:", proxyManager.isBrightDataAvailable() ? "✓" : "✗");
 
       const result = await proxyManager.makeRequest(`https://www.tiktok.com/@${handle}`, {
         headers: {
@@ -533,24 +555,91 @@ export async function scrapeTikTok(username: string) {
         throw new Error("Unable to parse TikTok metadata payload from profile page");
       }
 
-      const items = Object.values(payload?.ItemModule || {}) as any[];
+      // Modern TikTok structure: look for videos in ItemModule (old) or new structure
+      let items: any[] = [];
+
+      // Try old ItemModule format
+      if (payload.ItemModule) {
+        items = Object.values(payload.ItemModule);
+        console.log("🎵 TikTok: Found videos in ItemModule format");
+      }
+      // Try new __DEFAULT_SCOPE__ format
+      else if (payload.__DEFAULT_SCOPE__) {
+        // Search through all sections for video data
+        for (const key in payload.__DEFAULT_SCOPE__) {
+          const section = payload.__DEFAULT_SCOPE__[key];
+
+          // Check for itemList array
+          if (section?.itemList && Array.isArray(section.itemList)) {
+            items = section.itemList;
+            console.log(`🎵 TikTok: Found videos in ${key}.itemList`);
+            break;
+          }
+
+          // Check for nested video structures
+          if (section?.userInfo?.stats) {
+            // This section has user info, videos might be in same section
+            if (section.itemList) {
+              items = section.itemList;
+              console.log(`🎵 TikTok: Found videos in ${key} with user info`);
+              break;
+            }
+          }
+        }
+      }
+
+      // If still no videos, try to fetch from API using secUid
+      if (items.length === 0 && payload.__DEFAULT_SCOPE__?.['webapp.user-detail']?.userInfo?.user?.secUid) {
+        console.log("🎵 TikTok: No videos in HTML, attempting API fetch...");
+        const secUid = payload.__DEFAULT_SCOPE__['webapp.user-detail'].userInfo.user.secUid;
+
+        try {
+          const apiResult = await proxyManager.makeRequest(
+            `https://www.tiktok.com/api/post/item_list/?secUid=${secUid}&count=30&cursor=0`,
+            {
+              headers: {
+                Cookie: combinedCookie,
+                Referer: `https://www.tiktok.com/@${handle}`,
+                Accept: "application/json, text/plain, */*",
+              },
+              maxRetries: 2,
+              retryStrategies: true,
+            }
+          );
+
+          if (typeof apiResult.data === 'string') {
+            const apiData = JSON.parse(apiResult.data);
+            if (apiData.itemList && Array.isArray(apiData.itemList)) {
+              items = apiData.itemList;
+              console.log(`🎵 TikTok: Fetched ${items.length} videos from API`);
+            }
+          } else if (apiResult.data?.itemList) {
+            items = apiResult.data.itemList;
+            console.log(`🎵 TikTok: Fetched ${items.length} videos from API`);
+          }
+        } catch (apiError: any) {
+          console.log("🎵 TikTok: API fetch failed:", apiError.message);
+        }
+      }
+
       const videos = items.slice(0, 15).map((item) => ({
         video_id: item.id,
         url: `https://www.tiktok.com/@${handle}/video/${item.id}`,
+        title: item.desc || item.title || `TikTok video by @${handle}`,
         description: item.desc || item.title || `TikTok video by @${handle}`,
         views: item.stats?.playCount ?? null,
         likes: item.stats?.diggCount ?? null,
         comments: item.stats?.commentCount ?? null,
         shares: item.stats?.shareCount ?? null,
         duration: item.video?.duration ?? null,
-        author_name: item.author,
-        thumbnail_url: item.video?.cover ?? item.video?.dynamicCover,
-        music: item.music?.title,
-        created_at: item.createTime ? new Date(item.createTime * 1000).toISOString() : undefined,
+        published: item.createTime ? new Date(item.createTime * 1000).toISOString() : undefined,
+        channel: handle,
+        author_name: item.author || handle,
+        thumbnail_url: item.video?.cover ?? item.video?.dynamicCover ?? item.video?.originCover,
       }));
 
       if (videos.length === 0) {
-        throw new Error(`No videos found for @${username} - profile may be private, deleted, or cookies invalid/expired`);
+        throw new Error(`No videos found for @${username} - profile may be private, have no videos, or cookies may be invalid/expired`);
       }
 
       console.log("🎵 TikTok: Got", videos.length, "videos from profile");
